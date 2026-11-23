@@ -2,7 +2,7 @@
 
 A fantasy football app for ESPN leagues: trade calculator and trade ideas built on FantasyCalc values, weekly matchup and start/sit help, waivers, playoff odds, league history, and a 2027 rookie scouting board with a mock draft.
 
-**Open it:** https://hhbooth13.github.io/trade-desk/
+**Open it:** https://hhbooth13.github.io/Trade-desk/
 
 ## Put it on your iPhone
 
