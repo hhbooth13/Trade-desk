@@ -902,9 +902,9 @@ function tradeIdeas(m, opts) {
   const shop = opts.shop ? m.players.get(opts.shop) : null;
   const wantShape = opts.shape || '';
   const triples = !wantShape || wantShape === '3for1' || wantShape === '1for3' || !!target || !!shop;
-  /* Hold injured players (their value climbs as they heal and contenders won't pay now), unless you're shopping them or put them on your block. */
+  /* Injured players (IR, out, suspended, out for the season) can be offered to rebuilding teams, never to teams trying to win now. */
   const onBlock = new Set(((m.lg.block || {}).sell) || []);
-  let G = combos(tradeable(me.players.map(p => p.slot === 21 && (onBlock.has(p.id) || opts.shop === p.id) ? Object.assign({}, p, { slot: 20 }) : p).concat(me.picks || [])).filter(p => !outNow(p) || onBlock.has(p.id) || (opts.shop && opts.shop === p.id)), 10, triples);
+  let G = combos(tradeable(me.players.map(p => p.slot === 21 ? Object.assign({}, p, { slot: 20 }) : p).concat(me.picks || [])), 10, triples);
   if (shop) G = G.filter(x => x.c.some(p => p.id === shop.id));
   const all = [];
   for (const t of m.teams) {
@@ -918,6 +918,7 @@ function tradeIdeas(m, opts) {
     for (const g of G) for (const r of R) {
       const shape = g.n + 'for' + r.n;
       if (!SHAPES_OK[shape] || (wantShape && wantShape !== shape)) continue;
+      if (themWin && g.c.some(outNow)) continue;
       const st = sideTotals(themWin ? g.c.map(p => contendValue(m, p)) : g.vals, mode === 'contend' ? r.c.map(p => contendValue(m, p)) : r.vals), ga = st.ta, ra = st.tb;
       if (Math.min(ga, ra) < 400) continue;
       const f = (ra - ga) / Math.max(ga, ra);
@@ -1639,8 +1640,10 @@ function gamePlan(m, o, teamId) {
   if (buy.length) steps.push(dir === 'rebuild' ? 'Target young players like ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team trying to win now.' : 'Target ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team looking to the future.');
   if (t.needs.length && dir !== 'rebuild') steps.push('Your weakest spot' + (t.needs.length > 1 ? 's are ' : ' is ') + t.needs.join(' and ') + '. Upgrade there first.');
   steps.push(pickAdvice);
-  if (hold.length) steps.push('Hold ' + hold.slice(0, 2).map(p => p.name).join(' and ') + '. ' + (hold.length > 1 ? 'Their' : 'His') + ' value should climb as ' + (hold.length > 1 ? 'they get' : 'he gets') + ' healthy, and contenders won\u2019t pay for an injured player now.');
-  return { r, dir, hold, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p), out: outNow(p) })), buy, picks };
+  const rebuilders = others.filter(x => !isBuyer(x) && ['Rebuilding', 'Rising', 'Stuck', 'Middle'].includes(x.label)).map(x => x.team);
+  const holdInfo = hold.map(p => ({ p, buyers: rebuilders.filter(b => b.needs.includes(p.pos)).concat(rebuilders.filter(b => !b.needs.includes(p.pos))).slice(0, 3) }));
+  if (hold.length) steps.push(hold.slice(0, 2).map(p => p.name).join(' and ') + ': hold, or sell to a rebuilding team' + (holdInfo[0].buyers.length ? ' (' + holdInfo[0].buyers.map(b => b.abbrev || b.name).join(', ') + ')' : '') + '. Contenders won\u2019t pay for an injured player, but ' + (hold.length > 1 ? 'their' : 'his') + ' value climbs as ' + (hold.length > 1 ? 'they heal' : 'he heals') + '.');
+  return { r, dir, hold: holdInfo, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p), out: outNow(p) })), buy, picks };
 }
 
 /* ---------- 2027 rookie board (1QB dynasty), as of Nov 23, 2026 ----------
@@ -2463,7 +2466,7 @@ function openPlan(teamId) {
     '<p>' + esc(mine ? g.why : g.why.replace(/You’re/g, 'They’re').replace(/\bYour\b/g, 'Their').replace(/\byour\b/g, 'their').replace(/\bYou\b/g, 'They').replace(/\byou\b/g, 'them')) + '</p>' +
     (mine ? '<h3 class="mt">Next steps</h3><ol class="plan-steps">' + g.steps.map(s => '<li>' + esc(s) + '</li>').join('') + '</ol>' : '<h3 class="mt">How to deal with them</h3><p class="small">' + (g.dir === 'rebuild' ? 'They should sell veterans for picks and young players. Offer youth or picks for the players below.' : 'They’re buying. Offer them proven starters at ' + (t.needs.join(' or ') || 'any position') + '; ask for picks or young players back.') + '</p>') +
     (g.sell.length ? '<h3 class="mt">' + (mine ? (g.dir === 'rebuild' ? 'Sell before they lose value' : 'Trade chips') : (g.dir === 'rebuild' ? 'Players they should sell' : 'Players they could spare')) + '</h3>' + sellRows : '') +
-    (g.hold && g.hold.length ? '<h3 class="mt">' + (mine ? 'Hold while injured' : 'Injured, likely holding') + '</h3>' + g.hold.map(p => '<div class="plan-row">' + chip(p) + '<span class="small muted">' + esc(p.inj ? p.inj.replace('_', ' ').toLowerCase() : 'out') + (p.news ? ' · ' + esc(p.news.note.split('.')[0]) : '') + '</span></div>').join('') : '') +
+    (g.hold && g.hold.length ? '<h3 class="mt">Injured: hold or sell to a rebuilder</h3><p class="small muted" style="margin:0 0 4px">Teams trying to win now won\u2019t pay for ' + (g.hold.length > 1 ? 'these players' : 'him') + '. Rebuilding teams will, and ' + (g.hold.length > 1 ? 'their' : 'his') + ' value rises as ' + (g.hold.length > 1 ? 'they heal' : 'he heals') + ', so holding works too.</p>' + g.hold.map(x => '<div class="plan-row">' + chip(x.p) + '<span class="small muted">' + esc(x.p.inj ? x.p.inj.replace('_', ' ').toLowerCase() : 'out') + (x.buyers.length ? ' · Rebuilders: ' + x.buyers.map(b => esc(b.abbrev || b.name)).join(', ') : '') + '</span></div>').join('') : '') +
     (g.buy.length && mine ? '<h3 class="mt">' + (g.dir === 'rebuild' ? 'Young players to target' : 'Starters to target') + '</h3>' + buyRows : '') +
     (mine ? '<div class="row mt"><button class="btn" data-act="planIdeas" data-dir="' + g.dir + '">Find trades for this plan</button>' + (g.sell.length ? '<button class="btn ghost" data-act="planBlock">Put sell list on trade block</button>' : '') + '</div><p class="small muted" id="planMsg"></p>' :
       '<div class="row mt"><button class="btn" data-act="planTrade" data-id="' + t.id + '">See trade ideas with them</button><button class="btn ghost" data-act="planRoster" data-id="' + t.id + '">View their roster</button></div>') + '</div>';

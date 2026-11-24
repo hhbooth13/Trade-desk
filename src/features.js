@@ -367,6 +367,8 @@ function gamePlan(m, o, teamId) {
   if (buy.length) steps.push(dir === 'rebuild' ? 'Target young players like ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team trying to win now.' : 'Target ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team looking to the future.');
   if (t.needs.length && dir !== 'rebuild') steps.push('Your weakest spot' + (t.needs.length > 1 ? 's are ' : ' is ') + t.needs.join(' and ') + '. Upgrade there first.');
   steps.push(pickAdvice);
-  if (hold.length) steps.push('Hold ' + hold.slice(0, 2).map(p => p.name).join(' and ') + '. ' + (hold.length > 1 ? 'Their' : 'His') + ' value should climb as ' + (hold.length > 1 ? 'they get' : 'he gets') + ' healthy, and contenders won\u2019t pay for an injured player now.');
-  return { r, dir, hold, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p), out: outNow(p) })), buy, picks };
+  const rebuilders = others.filter(x => !isBuyer(x) && ['Rebuilding', 'Rising', 'Stuck', 'Middle'].includes(x.label)).map(x => x.team);
+  const holdInfo = hold.map(p => ({ p, buyers: rebuilders.filter(b => b.needs.includes(p.pos)).concat(rebuilders.filter(b => !b.needs.includes(p.pos))).slice(0, 3) }));
+  if (hold.length) steps.push(hold.slice(0, 2).map(p => p.name).join(' and ') + ': hold, or sell to a rebuilding team' + (holdInfo[0].buyers.length ? ' (' + holdInfo[0].buyers.map(b => b.abbrev || b.name).join(', ') + ')' : '') + '. Contenders won\u2019t pay for an injured player, but ' + (hold.length > 1 ? 'their' : 'his') + ' value climbs as ' + (hold.length > 1 ? 'they heal' : 'he heals') + '.');
+  return { r, dir, hold: holdInfo, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p), out: outNow(p) })), buy, picks };
 }
