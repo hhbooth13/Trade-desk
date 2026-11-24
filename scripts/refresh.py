@@ -164,7 +164,7 @@ def refresh_jerseys():
         for g in j.get('athletes') or []:
             for a in g.get('items') or []:
                 pos = ((a.get('position') or {}).get('abbreviation') or '')
-                if pos in ('QB', 'RB', 'WR', 'TE', 'K', 'FB') and a.get('jersey') not in (None, ''):
+                if pos in ('QB', 'RB', 'WR', 'TE', 'K', 'PK', 'FB') and a.get('jersey') not in (None, ''):
                     out[str(a['id'])] = str(a['jersey'])
     if len(out) < 300:
         print('Jersey list looks incomplete (%d); keeping previous file' % len(out))
