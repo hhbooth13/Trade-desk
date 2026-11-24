@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-23",
+ "updated": "2026-11-24",
  "items": [
   {
    "name": "De'Von Achane",
@@ -9,6 +9,33 @@
    "note": "Tore his left ACL; out for the season. His dynasty value from FantasyCalc already reflects the injury.",
    "date": "2026-11-23",
    "until": "2027-02-15"
+  },
+  {
+   "name": "Terrance Ferguson",
+   "espn": "4570037",
+   "redraft": 0.01,
+   "dynasty": 1.0,
+   "note": "Needs season-ending ankle surgery, according to Sean McVay, so he won't return from IR this year. He should be ready for 2027.",
+   "date": "2026-11-24",
+   "until": "2027-02-15"
+  },
+  {
+   "name": "Anthony Richardson",
+   "espn": "",
+   "redraft": 1.2,
+   "dynasty": 1.08,
+   "note": "The Colts released Daniel Jones and named Richardson their starter for the rest of the season, beginning in Week 12 against the Giants.",
+   "date": "2026-11-24",
+   "until": "2027-01-10"
+  },
+  {
+   "name": "Daniel Jones",
+   "espn": "3917792",
+   "redraft": 0.5,
+   "dynasty": 0.88,
+   "note": "Released by the Colts and went unclaimed on waivers, so he is a free agent with no starting job lined up.",
+   "date": "2026-11-24",
+   "until": "2027-01-10"
   }
  ]
 }
