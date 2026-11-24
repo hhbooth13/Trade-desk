@@ -131,3 +131,136 @@ document.addEventListener('click', e => {
   else if (act === 'scoutMode') { ui.scoutMode = el.dataset.mode; render(); }
   else if (act === 'rival') { const id = +el.dataset.id; lg.rivals = lg.rivals || []; lg.rivals = lg.rivals.includes(id) ? lg.rivals.filter(x => x !== id) : lg.rivals.concat(id); save([lg.id]); render(); }
 });
+
+/* ---------- Prospect card ---------- */
+function openProspect(name) {
+  const r = ROOKIES.find(x => x[0] === name);
+  if (!r) return;
+  const [nm, pos, school, ht, wt, cls, nfl, stats, note] = r;
+  const ag = rookieAge(r), br = boardRanks(nm);
+  const cons = ROOKIES.indexOf(r) + 1;
+  const mineOrder = Array.isArray(S.rookieBoard) ? S.rookieBoard : null;
+  const myRank = mineOrder ? mineOrder.indexOf(nm) + 1 : 0;
+  const act = S.leagues[S.active];
+  const lg = act && act.type === 'dynasty' ? act : S.order.map(id => S.leagues[id]).find(l => l.type === 'dynasty');
+  const m = lg ? modelFor(lg) : null;
+  let pickTxt = '—', mockTxt = '—';
+  if (m && m.picks.length) {
+    const n = m.teams.length, year = m.picks[0].year;
+    const byOverall = new Map(m.picks.filter(p => p.year === year).map(p => [(p.round - 1) * n + p.pickNo, p]));
+    const pk = byOverall.get(cons);
+    pickTxt = pk ? pk.round + '.' + String(pk.pickNo).padStart(2, '0') + ' (' + esc((m.byId.get(pk.owner) || {}).abbrev || '') + ')' : 'After round ' + Math.min(4, +lg.pickRounds || 3);
+    const md = mockDraft(m, ROOKIES, ui.board === 'mine' ? rookieOrder() : null, {});
+    const hit = md && md.out.find(x => x.r[0] === nm);
+    mockTxt = hit ? hit.pick.round + '.' + String(hit.pick.pickNo).padStart(2, '0') + ' to ' + esc(hit.team ? hit.team.abbrev || hit.team.name : '') : 'Undrafted';
+  }
+  const kv = (k, v) => '<div><span>' + k + '</span><b>' + v + '</b></div>';
+  const avgTxt = a => a ? '#' + a.avg.toFixed(1) + ' <small class="muted">(' + a.n + ' of ' + a.of + ' boards)</small>' : 'Not ranked';
+  const career = Array.isArray(r.career) && r.career.length ? r.career : null;
+  const d = $('#modal');
+  d.innerHTML = '<div class="modal-card sheet wide" role="dialog" aria-modal="true" aria-labelledby="prh">' +
+    '<div class="sheet-head"><span class="av lg" style="background:var(--' + pos.toLowerCase() + ')" aria-hidden="true">' + esc(initials(nm)) + '</span><div><h3 id="prh">' + esc(nm) + '</h3><div class="pl-meta">' + posChip(pos) + '<span>' + esc(school) + '</span><span>' + esc(cls) + '</span><span>' + esc(ht) + ', ' + wt + ' lbs</span></div>' +
+    '<div class="small muted">' + (ag.est ? '~' : '') + 'Age ' + ag.now.toFixed(1) + ' · ' + ag.draft.toFixed(1) + ' on draft day' + (ag.est ? ' (estimated)' : '') + '</div></div><button class="x sheet-x" id="pClose" aria-label="Close">×</button></div>' +
+    '<div class="kv">' + kv('Our board', '#' + cons) + (myRank ? kv('Your board', '#' + myRank) : '') + kv('NFL draft', esc(nfl)) + kv('Your league', pickTxt) + kv('Mock draft', mockTxt) + kv('Dynasty boards', avgTxt(br.dyn)) + kv('NFL boards', avgTxt(br.nfl)) + '</div>' +
+    '<h3 class="mt">Scouting note</h3><p class="pr-note" style="color:var(--ink)">' + esc(note) + '</p>' +
+    '<h3 class="mt">College stats</h3>' + (career ? '<table class="roster"><tbody>' + career.slice().reverse().map(([y, t]) => '<tr><td class="slot">' + y + '</td><td>' + esc(t) + '</td></tr>').join('') + '</tbody></table>' : '<p class="small">' + esc(stats) + ' <span class="muted">(2026)</span></p>') +
+    '<h3 class="mt">Big boards</h3><table class="roster boards"><tbody>' + br.rows.map(x => '<tr><td><a href="' + esc(x.b.url) + '" target="_blank" rel="noopener">' + esc(x.b.name) + '</a><div class="small muted">' + (x.b.type === 'nfl' ? 'NFL draft · all positions' : 'Dynasty rookies') + ' · ' + when(x.b.date + 'T12:00:00') + '</div></td><td class="num">' + (x.rank ? '#' + x.rank : '<span class="muted small">not in top ' + x.b.depth + '</span>') + '</td></tr>').join('') + '</tbody></table>' +
+    '<p class="small muted">NFL boards rank every position, so their numbers run higher than rookie-only fantasy boards.</p></div>';
+  d.hidden = false;
+  const close = () => { d.hidden = true; };
+  $('#pClose').onclick = close;
+  d.onclick = e => { if (e.target === d) close(); };
+  $('#pClose').focus();
+}
+
+/* ---------- Search any player ---------- */
+function globalPlayer(m, id) {
+  if (!ALLPLAYERS || !ALLPLAYERS.players) return null;
+  const pid = String(id).replace(/^e/, '');
+  const row = ALLPLAYERS.players.find(x => String(x[0]) === pid);
+  if (!row) return null;
+  const [espn, name, posId, pro, owned] = row;
+  const pos = POS[posId] || '?';
+  const fc = m.vs.byEspn.get(String(espn)) || m.vs.byKey.get(nk(name) + '|' + pos);
+  const p = { id: 'e' + espn, espn: String(espn), name, pos, team: (fc && fc.team) || PRO[pro] || 'FA', proTeam: pro, slot: 20, inj: '', value: fc ? fc.value : 0, fcValue: fc ? fc.value : 0, age: fc ? fc.age : null, trend: fc ? fc.trend : 0, owner: null, owned, est: fc ? '' : null };
+  if (!fc) { p.est = 'floor'; p.estWhy = 'Not valued by FantasyCalc; deep depth player.'; p.value = pos === 'K' || pos === 'D/ST' ? Math.round(30 + 1.5 * (owned || 0)) : Math.round(10 + (owned || 0) * 4); }
+  applyNews([p], NEWS, m.lg.type === 'dynasty' ? 'dynasty' : 'redraft');
+  return p;
+}
+function searchPool(m) {
+  const seen = new Set(), out = [];
+  const add = p => { if (p && !seen.has(p.id)) { seen.add(p.id); out.push(p); } };
+  m.teams.forEach(t => t.players.forEach(add));
+  (m.freeAgents || []).forEach(add);
+  return { out, seen };
+}
+function openSearch() {
+  const d = $('#modal');
+  d.innerHTML = '<div class="modal-card sheet wide search-sheet" role="dialog" aria-modal="true" aria-label="Search players"><div class="row" style="margin:0"><input id="gq" type="search" autocomplete="off" placeholder="Search any NFL player or 2027 prospect" style="flex:1"><button class="x" id="pClose" aria-label="Close">×</button></div><div id="gres" class="gres"></div></div>';
+  d.hidden = false;
+  const close = () => { d.hidden = true; };
+  $('#pClose').onclick = close;
+  d.onclick = e => { if (e.target === d) close(); };
+  const run = () => {
+    const q = nk($('#gq').value), m = model(), box = $('#gres');
+    if (!q) { box.innerHTML = '<p class="muted small pad">Every active NFL player' + (ALLPLAYERS ? ' (' + ALLPLAYERS.players.length.toLocaleString('en-US') + ')' : '') + ', plus this year’s rookie prospects.</p>'; return; }
+    const pool = searchPool(m), hits = pool.out.filter(p => p.pos !== 'PICK' && nk(p.name).includes(q));
+    if (ALLPLAYERS) ALLPLAYERS.players.forEach(r => { if (hits.length < 60 && !pool.seen.has('e' + r[0]) && nk(r[1]).includes(q)) { const p = globalPlayer(m, r[0]); if (p) hits.push(p); } });
+    m.vs.list.forEach(x => { if (x.pos !== 'PICK' && !pool.seen.has(x.id) && !hits.some(h => h.id === x.id) && nk(x.name).includes(q)) hits.push(Object.assign({ owner: null }, x)); });
+    hits.sort((a, b) => (nk(a.name).startsWith(q) ? 0 : 1) - (nk(b.name).startsWith(q) ? 0 : 1) || b.value - a.value);
+    const pros = ROOKIES.filter(r => nk(r[0]).includes(q)).slice(0, 5);
+    const status = p => { if (p.owner != null) { const t = m.byId.get(p.owner); return t ? (t.id === m.lg.myTeamId ? '<span class="fair good">Yours</span>' : '<span class="tb" style="background:#4a5160">' + esc(t.abbrev || t.name) + '</span>') : ''; } return '<span class="fair mid">' + (p.waivers ? 'Waivers' : 'Free agent') + '</span>'; };
+    box.innerHTML = (hits.slice(0, 25).map(p => '<button class="gr" data-act="gplayer" data-id="' + esc(p.id) + '">' + playerLine(p) + '<span class="gr-r">' + status(p) + '<b class="num">' + fmt(p.value) + '</b></span></button>').join('') +
+      (pros.length ? '<div class="tierh">2027 prospects</div>' + pros.map(r => '<button class="gr" data-act="prospect" data-name="' + esc(r[0]) + '"><div class="pl">' + '<span class="av" style="background:var(--' + r[1].toLowerCase() + ')">' + esc(initials(r[0])) + '</span><div class="pl-text"><div class="pl-main"><span class="pl-name">' + esc(r[0]) + '</span></div><div class="pl-meta">' + posChip(r[1]) + '<span>' + esc(r[2]) + '</span></div></div></div><span class="gr-r"><span class="fair good">#' + (ROOKIES.indexOf(r) + 1) + '</span></span></button>').join('') : '')) ||
+      '<p class="muted small pad">No players match.</p>';
+  };
+  $('#gq').addEventListener('input', run);
+  run();
+  $('#gq').focus();
+}
+
+/* ---------- Live ESPN details on player cards (Home Screen app only; the claude.ai page can't reach ESPN) ---------- */
+async function loadLive(p) {
+  const el = document.getElementById('pLive');
+  if (!el || !PWA || !p.espn || !/^\d+$/.test(p.espn) || p.pos === 'D/ST') return;
+  el.innerHTML = '<p class="muted small">Loading ESPN stats…</p>';
+  const base = 'https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/athletes/' + p.espn;
+  try {
+    const [a, st, gl] = await Promise.all([fetch(base).then(r => r.json()), fetch(base + '/stats').then(r => r.json()).catch(() => ({})), fetch(base + '/gamelog').then(r => r.json()).catch(() => ({}))]);
+    const at = a.athlete || a;
+    const bio = [at.age ? 'Age ' + at.age : '', at.displayHeight && at.displayWeight ? at.displayHeight + ', ' + at.displayWeight : '', at.displayExperience || '', at.college && at.college.name ? at.college.name : '', at.displayDraft || ''].filter(Boolean).join(' · ');
+    const cur = c => { const rows = (c.statistics || []); const last = rows[rows.length - 1]; return last && last.season ? { y: last.season.year, v: Object.fromEntries((c.labels || []).map((l, i) => [l, last.stats[i]])) } : null; };
+    const cats = {}; (st.categories || []).forEach(c => { const x = cur(c); if (x) cats[c.name] = x; });
+    const parts = [];
+    if (cats.passing && +String(cats.passing.v.ATT || 0).replace(/,/g, '') > 0) parts.push(cats.passing.v.YDS + ' pass yds, ' + cats.passing.v.TD + ' TD, ' + cats.passing.v.INT + ' INT');
+    if (cats.rushing && +String(cats.rushing.v.CAR || 0).replace(/,/g, '') > 0) parts.push(cats.rushing.v.CAR + ' car, ' + cats.rushing.v.YDS + ' rush yds, ' + cats.rushing.v.TD + ' TD');
+    if (cats.receiving && +String(cats.receiving.v.REC || 0).replace(/,/g, '') > 0) parts.push(cats.receiving.v.REC + ' rec (' + (cats.receiving.v.TGTS || '?') + ' tgt), ' + cats.receiving.v.YDS + ' yds, ' + cats.receiving.v.TD + ' TD');
+    const gp = (cats.rushing || cats.receiving || cats.passing || {}).v || {};
+    const season = (cats.rushing || cats.receiving || cats.passing || {}).y;
+    let games = '';
+    const reg = (gl.seasonTypes || []).find(s => /Regular/.test(s.displayName)) || (gl.seasonTypes || [])[0];
+    const evs = reg && reg.categories && reg.categories[0] ? reg.categories[0].events || [] : [];
+    if (evs.length) {
+      const labels = gl.labels || [], names = gl.names || [];
+      const pick = (row, name) => { const i = names.indexOf(name); return i >= 0 ? row.stats[i] : null; };
+      const line = row => {
+        const bits = [];
+        const pyd = pick(row, 'passingYards'), ptd = pick(row, 'passingTouchdowns'), car = pick(row, 'rushingAttempts'), ryd = pick(row, 'rushingYards'), rtd = pick(row, 'rushingTouchdowns'), rec = pick(row, 'receptions'), cyd = pick(row, 'receivingYards'), ctd = pick(row, 'receivingTouchdowns');
+        if (pyd != null && +pyd) bits.push(pyd + ' pass yds' + (+ptd ? ', ' + ptd + ' TD' : ''));
+        if (car != null && +car) bits.push(car + '-' + ryd + (+rtd ? ', ' + rtd + ' TD' : ''));
+        if (rec != null && +rec) bits.push(rec + ' rec ' + cyd + ' yds' + (+ctd ? ', ' + ctd + ' TD' : ''));
+        return bits.join(' · ') || labels.slice(0, 3).map((l, i) => l + ' ' + row.stats[i]).join(' · ');
+      };
+      games = '<h3 class="mt">Last ' + Math.min(5, evs.length) + ' games</h3><table class="roster"><tbody>' + evs.slice(0, 5).map(row => { const e = (gl.events || {})[row.eventId] || {}; return '<tr><td class="slot">Wk ' + (e.week || '') + '</td><td class="small">' + esc((e.atVs || '') + ' ' + ((e.opponent || {}).abbreviation || '')) + ' <span class="' + (e.gameResult === 'W' ? 'pos-d' : 'neg-d') + '">' + esc((e.gameResult || '') + ' ' + (e.score || '')) + '</span></td><td class="small">' + esc(line(row)) + '</td></tr>'; }).join('') + '</tbody></table>';
+    }
+    el.innerHTML = (bio ? '<p class="small muted">' + esc(bio) + '</p>' : '') + (parts.length ? '<h3 class="mt">' + (season || '') + ' season' + (gp.GP ? ' · ' + gp.GP + ' games' : '') + '</h3><p class="small">' + parts.map(esc).join('<br>') + '</p>' : '') + games + '<p class="small muted">Live from ESPN.</p>';
+  } catch (e) { el.innerHTML = '<p class="muted small">Couldn’t load ESPN stats right now.</p>'; }
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  if (el.dataset.act === 'prospect') { e.stopPropagation(); openProspect(el.dataset.name); }
+  else if (el.dataset.act === 'gplayer') { openPlayer(el.dataset.id); }
+  else if (el.dataset.act === 'gsearch') { openSearch(); }
+});

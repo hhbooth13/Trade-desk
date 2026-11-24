@@ -105,6 +105,14 @@ def prospect(name, pos, school, fetch=get_json):
     line = stat_text(pos, season_line(st.get('categories'), SEASON))
     if line:
         out['stats'] = line
+    years = sorted({(r.get('season') or {}).get('year') for c in (st.get('categories') or []) for r in c.get('statistics', []) if (r.get('season') or {}).get('year')})
+    career = []
+    for y in years:
+        t = stat_text(pos, season_line(st.get('categories'), y))
+        if t:
+            career.append([y, t])
+    if career:
+        out['career'] = career
     if at.get('displayHeight'):
         out['ht'] = at['displayHeight'].replace("' ", "'")
     w = re.match(r'(\d+)', at.get('displayWeight') or '')
@@ -113,6 +121,33 @@ def prospect(name, pos, school, fetch=get_json):
     if CLASS.get(at.get('displayExperience')):
         out['cls'] = CLASS[at['displayExperience']]
     return out
+
+
+POS_IDS = {1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'D/ST'}
+
+
+def refresh_players():
+    """Every active NFL player ESPN lists at QB/RB/WR/TE/K/DST, for the app's player search."""
+    url = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/%d/players?scoringPeriodId=0&view=players_wl' % SEASON
+    req = urllib.request.Request(url, headers=dict(UA, **{'x-fantasy-filter': json.dumps({'filterActive': {'value': True}})}))
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            j = json.loads(r.read().decode('utf-8'))
+    except Exception as e:  # noqa: BLE001
+        print('ESPN player list unavailable; keeping previous file', e)
+        return
+    rows = []
+    for p in j:
+        if p.get('defaultPositionId') not in POS_IDS:
+            continue
+        owned = (p.get('ownership') or {}).get('percentOwned')
+        rows.append([p['id'], p.get('fullName', ''), p['defaultPositionId'], p.get('proTeamId', 0), round(owned, 1) if owned is not None else None])
+    if len(rows) < 500:
+        print('ESPN player list looks incomplete (%d); keeping previous file' % len(rows))
+        return
+    rows.sort(key=lambda r: -(r[4] or 0))
+    json.dump({'asOf': date.today().isoformat(), 'players': rows}, open(os.path.join(SRC, 'players.json'), 'w'), separators=(',', ':'), ensure_ascii=False)
+    print('ESPN players:', len(rows))
 
 
 def refresh_prospects():
@@ -140,4 +175,5 @@ def refresh_prospects():
 
 if __name__ == '__main__':
     refresh_values()
+    refresh_players()
     refresh_prospects()

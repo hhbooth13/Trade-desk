@@ -213,7 +213,7 @@ function syncButton() {
 }
 function renderHeader() {
   const lg = S.leagues[S.active];
-  $('#leagueTabs').innerHTML = S.order.map(id => {
+  $('#leagueTabs').innerHTML = '<button class="ltab gs" data-act="gsearch" aria-label="Search players"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Search</button>' + S.order.map(id => {
     const l = S.leagues[id];
     return '<button class="ltab' + (id === S.active ? ' on' : '') + '" data-act="league" data-id="' + esc(id) + '">' + esc(l.name) + '<small>' + (l.demo ? 'demo' : l.type) + '</small></button>';
   }).join('') + (PWA && S.order.some(id => !S.leagues[id].demo) ? syncButton() : '') + '<a class="ltab add" href="#sync">' + (PWA && S.order.some(id => !S.leagues[id].demo) ? '+ League' : '+ Sync league') + '</a>';
@@ -552,11 +552,11 @@ function viewScout() {
     const cr = consensusRank.get(name), diff = mineBoard ? cr - k : 0;
     let head = '';
     if (!f && !mineBoard && tier !== lastTier) { head = '<div class="tierh">' + TIER_NAME[tier] + '</div>'; lastTier = tier; }
-    return head + '<article class="prospect' + (isMine ? ' me' : '') + '">' +
+    return head + '<article class="prospect' + (isMine ? ' me' : '') + '" data-act="prospect" data-name="' + esc(name) + '" role="button" tabindex="0">' +
       '<div class="pr-rank num">' + k + (diff ? '<small class="' + (diff > 0 ? 'pos-d' : 'neg-d') + '">' + (diff > 0 ? '▲' : '▼') + Math.abs(diff) + '</small>' : '') + '</div>' +
       '<div class="pr-main"><div class="pl-main">' + posChip(pos) + '<span class="pl-name">' + esc(name) + '</span></div>' +
       '<div class="pl-meta pr-bio"><span>' + esc(school) + '</span><span>' + esc(ht) + ', ' + wt + ' lbs</span><span>' + esc(cls) + '</span><span class="agechip' + (ag.draft < 21.5 ? ' young' : ag.draft >= 23 ? ' old' : '') + '" title="' + (ag.est ? 'Birth date not published; estimated from class year' : 'Born ' + esc(r[9])) + '">' + (ag.est ? '~' : '') + 'Age ' + ag.now.toFixed(1) + ' · ' + ag.draft.toFixed(1) + ' on draft day' + (ag.est ? ' (est.)' : '') + '</span><span>NFL: ' + esc(nfl) + '</span></div>' +
-      '<div class="pr-stats">2026: ' + esc(stats) + '</div><p class="pr-note">' + esc(note) + '</p></div>' +
+      '<div class="pr-stats">2026: ' + esc(stats) + '</div><p class="pr-note">' + esc(note) + '</p>' + (() => { const br = boardRanks(name); return br.dyn ? '<div class="small muted">Dynasty boards avg <b class="pos-d">#' + br.dyn.avg.toFixed(1) + '</b>' + (br.nfl ? ' · NFL boards avg <b>#' + br.nfl.avg.toFixed(0) + '</b>' : '') + ' · tap for details</div>' : '<div class="small muted">Tap for details</div>'; })() + '</div>' +
       '<div class="pr-pick"><span class="pk' + (isMine ? ' mine' : '') + '">' + label + '</span>' + (own ? '<div class="small muted">' + (isMine ? 'Your pick' : esc(own.abbrev || own.name)) + '</div>' : '') +
       (mineBoard ? '<div class="mv"><button class="mvb" data-act="mv" data-name="' + esc(name) + '" data-d="-1" aria-label="Move ' + esc(name) + ' up">▲</button><button class="mvb" data-act="mv" data-name="' + esc(name) + '" data-d="1" aria-label="Move ' + esc(name) + ' down">▼</button></div>' : '') + '</div></article>';
   }).join('');
@@ -703,6 +703,8 @@ document.addEventListener('paste', e => {
 });
 document.addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.pl[data-act="player"]')) { e.preventDefault(); openPlayer(e.target.dataset.id); return; }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.prospect[data-act="prospect"]')) { e.preventDefault(); openProspect(e.target.dataset.name); return; }
+  if (e.key === '/' && !(e.target.matches && e.target.matches('input, textarea, select'))) { e.preventDefault(); openSearch(); return; }
   if (e.key === 'Escape' && !$('#modal').hidden) { $('#modal').hidden = true; return; }
   if (e.key === 'Escape' && ui.search.side) { ui.search = { side: null, q: '' }; const r = document.querySelectorAll('.results'); r.forEach(x => x.innerHTML = ''); }
 });
@@ -720,7 +722,7 @@ function doImport(txt) {
   }
 }
 function findPlayer(m, id) {
-  return m.players.get(id) || (m.freeAgents || []).find(p => p.id === id) || m.vs.byId.get(id) || null;
+  return m.players.get(id) || (m.freeAgents || []).find(p => p.id === id) || globalPlayer(m, id) || m.vs.byId.get(id) || null;
 }
 function openPlayer(id) {
   const m = model(), p = findPlayer(m, id), lg = m.lg;
@@ -742,6 +744,7 @@ function openPlayer(id) {
     (p.proj != null ? kv('Proj this week', p.proj.toFixed(1)) : '') + (p.avg != null ? kv('Season avg', p.avg.toFixed(1)) : '') + (p.owned != null ? kv('Rostered', Math.round(p.owned) + '%') : '') + '</div>' +
     (p.est ? '<p class="small muted">* ' + esc(p.estWhy || '') + '</p>' : '') +
     (p.news ? '<div class="newsbox"><b>News · ' + esc(when(p.news.date)) + '</b><p>' + esc(p.news.note) + '</p>' + (p.newsAdj ? '<span class="small muted">Value adjusted ' + (p.news.factor < 1 ? 'down ' + Math.round((1 - p.news.factor) * 100) + '%' : 'up ' + Math.round((p.news.factor - 1) * 100) + '%') + ' for this.</span>' : '') + '</div>' : '') +
+    '<div id="pLive"></div>' +
     (games && games.length ? '<h3 class="mt">Fantasy playoffs</h3><div class="row">' + games.map(g => '<div class="c"><div class="small muted">Wk ' + g.w + '</div>' + (g.opp === 'BYE' ? '<span class="opp bye">BYE</span>' : g.opp ? '<span class="opp ' + (g.ease >= 1.08 ? 'easy' : g.ease <= 0.92 ? 'hard' : 'mid') + '">' + esc(g.opp) + '</span>' : '<span class="muted">?</span>') + '</div>').join('') + '</div>' : '') +
     '<div class="row mt">' +
     (own && own.id !== me ? '<button class="btn" id="pTarget">Build offers for him</button><button class="btn ghost" id="pCalc">Add to calculator</button>' : '') +
@@ -757,6 +760,7 @@ function openPlayer(id) {
   if ($('#pTrade')) $('#pTrade').onclick = () => { close(); ui.ideaTarget = null; ui.ideaShop = p.id; go('ideas'); };
   if ($('#pShop')) $('#pShop').onclick = () => { close(); if (!ui.calc.a.includes(p.id)) ui.calc.a.push(p.id); ui.calc.aTeam = p.owner; go('calc'); };
   if ($('#pEdit')) $('#pEdit').onclick = () => editValue(p.id);
+  loadLive(p);
   if ($('#pBlock')) $('#pBlock').onclick = () => {
     const b = blockOf(lg), k = own.id === me ? 'sell' : 'want';
     b[k] = b[k].includes(p.id) ? b[k].filter(x => x !== p.id) : b[k].concat(p.id);

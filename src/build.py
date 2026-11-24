@@ -10,11 +10,13 @@ core, feat, rook, ui2, sync = rd('core.js'), rd('features.js'), rd('rookies.js')
 bm = 'javascript:' + urllib.parse.quote(rd('bookmarklet.js'), safe='')
 live = json.dumps(opt_json('rookie_stats.json', None), separators=(',', ':'), ensure_ascii=False)
 news = json.dumps(opt_json('news.json', {'items': []}), separators=(',', ':'), ensure_ascii=False)
+allp = json.dumps(opt_json('players.json', None), separators=(',', ':'), ensure_ascii=False)
+boards = rd('boards.js')
 def make(pwa):
     ui = rd('ui.js')
     ui = (ui.replace('__SEED_R__', json.dumps(rd('seed_redraft.txt'))).replace('__SEED_D__', json.dumps(rd('seed_dynasty.txt')))
             .replace('__BM__', json.dumps(bm)).replace('__PWA__', 'true' if pwa else 'false').replace('__NEWS__', news))
-    r = rook.replace('__ROOKIE_LIVE__', live)
+    r = rook.replace('__ROOKIE_LIVE__', live) + '\n' + boards + '\nconst ALLPLAYERS = ' + allp + ';'
     html = rd('app.template.html').replace('/*CORE*/', core).replace('/*ROOKIES*/', feat + '\n' + r + '\n' + sync + '\n' + ui2).replace('/*UI*/', ui)
     assert '</script' not in core + ui + feat + r + ui2 + sync
     if pwa:

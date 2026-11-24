@@ -98,6 +98,7 @@ if (ROOKIE_LIVE && ROOKIE_LIVE.players) {
     if (x.wt) r[4] = x.wt;
     if (x.cls) r[5] = x.cls;
     if (x.stats) r[7] = x.stats;
+    if (x.career) r.career = x.career;
   });
   ROOKIE_STATS_ASOF = ROOKIE_LIVE.asOf;
 }
