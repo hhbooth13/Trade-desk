@@ -392,7 +392,11 @@ function viewLeague(m) {
     SKILL.map(p => '<td class="c">' + rankChip(t.rank[p], n) + '</td>').join('') + '</tr>').join('');
   return '<section class="head-row"><h2>' + esc(m.lg.name) + '</h2></section>' + standingsCard(m) + '<h3 class="mt">Power rankings</h3>' +
     '<p class="muted small lead">Ranked by starting-lineup trade value' + (dynL ? '; Roster includes draft picks' : '') + '. Position columns show where each team’s starters rank. Green means top third, red bottom third: red teams are your trade partners for that position.</p>' +
-    '<div class="card tablewrap"><table class="league"><thead><tr><th>#</th><th>Team</th><th>Record</th><th>Starters</th><th class="hide-sm">Roster</th>' + (dynL ? '<th class="hide-sm">Picks</th>' : '') + SKILL.map(p => '<th class="c">' + p + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + managersCard(m) + rivalsCard(m) + gradesCard(m) + recordsCard(m);
+    '<div class="card tablewrap"><table class="league"><thead><tr><th>#</th><th>Team</th><th>Record</th><th>Starters</th><th class="hide-sm">Roster</th>' + (dynL ? '<th class="hide-sm">Picks</th>' : '') + SKILL.map(p => '<th class="c">' + p + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + managersCard(m) + rivalsCard(m);
+}
+
+function viewHistory(m) {
+  return '<section class="head-row"><h2>History</h2></section><p class="muted small lead">Every trade in ' + esc(m.lg.name) + ' graded by today\u2019s values, plus the league\u2019s record book.</p>' + gradesCard(m) + recordsCard(m);
 }
 
 function pwaSteps() {
@@ -585,7 +589,7 @@ function render() {
   const v = ui.view;
   let html = '';
   try {
-    html = v === 'weekly' ? viewWeekly(m) : v === 'scout' ? viewScout() : v === 'sync' ? viewSync() : v === 'ideas' ? viewIdeas(m) : v === 'calc' ? viewCalc(m) : v === 'league' ? viewLeague(m) : viewTeam(m);
+    html = v === 'weekly' ? viewWeekly(m) : v === 'scout' ? viewScout() : v === 'sync' ? viewSync() : v === 'ideas' ? viewIdeas(m) : v === 'calc' ? viewCalc(m) : v === 'league' ? viewLeague(m) : v === 'history' ? viewHistory(m) : viewTeam(m);
   } catch (e) { html = '<section class="card"><h2>Something went wrong</h2><p>' + esc(e.message) + '</p><p>Try syncing the league again.</p></section>'; }
   $('#view').innerHTML = html;
   if (v === 'sync') { const a = $('#bmLink'); if (a) a.setAttribute('href', BOOKMARKLET); }
@@ -630,7 +634,7 @@ function showResults(side, q) {
 /* ----- events ----- */
 function route() {
   const h = (location.hash || '').replace('#', '');
-  ui.view = ['team', 'ideas', 'calc', 'weekly', 'league', 'scout', 'sync'].includes(h) ? h : 'team';
+  ui.view = ['team', 'ideas', 'calc', 'weekly', 'league', 'history', 'scout', 'sync'].includes(h) ? h : 'team';
   render();
   window.scrollTo(0, 0);
 }

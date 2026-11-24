@@ -32,7 +32,7 @@ function counterCard(m, A, B, tA, tB) {
 
 function gradesCard(m) {
   const gs = tradeGrades(m);
-  if (!gs.length) return '<section class="card mt"><h3>Trade grades</h3><p class="muted small">' + (m.lg.trades ? 'No trades in your league yet this season.' : 'Trade history comes with the updated sync bookmark. Reinstall it from the Sync tab and sync again.') + '</p></section>';
+  if (!gs.length) return '<section class="card mt"><h3>Trade grades</h3><p class="muted small">' + (m.lg.trades ? 'No trades in your league yet this season.' : (PWA ? 'Tap the sync button up top to load your league\u2019s trades.' : 'Trade history comes with the updated sync bookmark. Reinstall it from the Sync tab and sync again.')) + '</p></section>';
   return '<section class="card mt"><h3>Trade grades</h3><p class="muted small">Every trade this season, judged by what each side’s haul is worth today.</p>' +
     gs.map(g => '<div class="grade"><div class="grade-top"><span class="fair ' + (g.grade === 'Even' ? 'good' : 'mid') + '">' + (g.grade === 'Even' ? 'Even trade' : (g.grade === 'Win' ? 'Clear win: ' : 'Slight edge: ') + esc(g.winner ? g.winner.name : '')) + '</span><span class="small muted">' + (g.d ? when(g.d) : '') + '</span></div>' +
       g.rows.map(r => '<div class="grade-side"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b><span class="muted small">got</span></div><div class="grade-got">' + r.got.map(p => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + ' <b>' + fmt(p.value) + '</b></span>').join('') + '</div><div class="num">' + fmt(r.v) + '</div></div>').join('') + '</div>').join('') + '</section>';
