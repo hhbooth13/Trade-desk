@@ -502,7 +502,7 @@ function viewOutlook(m) {
   const arrow = d => d > 1 ? '<span class="pos-d small">▲' + d + '</span>' : d < -1 ? '<span class="neg-d small">▼' + -d + '</span>' : '<span class="muted small">–</span>';
   const tag = l => '<span class="otag" style="--h:' + OUTLOOK_HUE[l] + '" title="' + esc(OUTLOOK_TIP[l]) + '">' + l + '</span>';
   const table = '<div class="card tablewrap"><table class="league outlook"><thead><tr><th>Team</th>' + o.windows.map(w => '<th class="c">' + w.label + '</th>').join('') + '<th class="c hide-sm">Trend</th><th class="c hide-sm">Age</th><th class="c hide-sm">1sts</th></tr></thead><tbody>' +
-    o.rows.map(r => '<tr class="tap' + (r.team.id === m.lg.myTeamId ? ' me' : '') + '" data-act="plan" data-id="' + r.team.id + '" title="Tap for the game plan"><td><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<div><button class="link" data-act="openTeam" data-id="' + r.team.id + '">' + teamName(r.team) + '</button><div>' + tag(r.label) + '</div></div></div></td>' +
+    o.rows.map(r => '<tr class="tap' + (r.team.id === m.lg.myTeamId ? ' me' : '') + '" data-act="plan" data-id="' + r.team.id + '" title="Tap for the game plan"><td><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<div><button class="link" data-act="plan" data-id="' + r.team.id + '">' + teamName(r.team) + '</button><div>' + tag(r.label) + '</div></div></div></td>' +
       r.ranks.map(x => '<td class="c">' + rk(x, n) + '</td>').join('') + '<td class="c hide-sm">' + arrow(r.trend) + '</td><td class="c num hide-sm">' + (r.age ? r.age.toFixed(1) : '–') + '</td><td class="c num hide-sm">' + r.picks + '</td></tr>').join('') + '</tbody></table></div>';
   const me = o.rows.find(r => r.team.id === m.lg.myTeamId);
   const mine = me ? '<section class="card"><h3>Your outlook</h3><div class="row" style="margin:0 0 6px">' + tag(me.label) + '<span class="small">' + esc(OUTLOOK_TIP[me.label]) + '</span></div><p class="small" style="margin:0">' + o.windows.map((w, i) => w.label + ': <b>' + ord(me.ranks[i]) + '</b>').join(' · ') + (me.age ? ' · starters average ' + me.age.toFixed(1) + ' years old' : '') + '</p><div class="row"><button class="btn" data-act="plan" data-id="' + me.team.id + '">See your game plan</button></div></section>' : '';
@@ -534,7 +534,7 @@ function openPlan(teamId) {
     (g.sell.length ? '<h3 class="mt">' + (mine ? (g.dir === 'rebuild' ? 'Sell before they lose value' : 'Trade chips') : (g.dir === 'rebuild' ? 'Players they should sell' : 'Players they could spare')) + '</h3>' + sellRows : '') +
     (g.buy.length && mine ? '<h3 class="mt">' + (g.dir === 'rebuild' ? 'Young players to target' : 'Starters to target') + '</h3>' + buyRows : '') +
     (mine ? '<div class="row mt"><button class="btn" data-act="planIdeas" data-dir="' + g.dir + '">Find trades for this plan</button>' + (g.sell.length ? '<button class="btn ghost" data-act="planBlock">Put sell list on trade block</button>' : '') + '</div><p class="small muted" id="planMsg"></p>' :
-      '<div class="row mt"><button class="btn" data-act="planTrade" data-id="' + t.id + '">See trade ideas with them</button></div>') + '</div>';
+      '<div class="row mt"><button class="btn" data-act="planTrade" data-id="' + t.id + '">See trade ideas with them</button><button class="btn ghost" data-act="planRoster" data-id="' + t.id + '">View their roster</button></div>') + '</div>';
   d.hidden = false;
   ui._plan = g;
   const close = () => { d.hidden = true; };
@@ -547,5 +547,6 @@ document.addEventListener('click', e => {
   if (a === 'plan') openPlan(el.dataset.id);
   else if (a === 'planIdeas') { const lg = S.leagues[S.active]; lg.mode = el.dataset.dir === 'rebuild' ? 'rebuild' : el.dataset.dir === 'contend' ? 'contend' : null; save([lg.id]); $('#modal').hidden = true; go('ideas'); }
   else if (a === 'planBlock') { const lg = S.leagues[S.active], b = blockOf(lg); (ui._plan ? ui._plan.sell : []).forEach(x => { if (!b.sell.includes(x.p.id)) b.sell.push(x.p.id); }); save([lg.id]); const msg = $('#planMsg'); if (msg) msg.textContent = 'Added to your trade block. Trade ideas will try to move them.'; }
+  else if (a === 'planRoster') { ui.teamView = +el.dataset.id; $('#modal').hidden = true; go('team'); }
   else if (a === 'planTrade') { ui.ideaTeam = el.dataset.id; $('#modal').hidden = true; go('ideas'); }
 });
