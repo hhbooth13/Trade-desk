@@ -43,7 +43,8 @@ function resolveLeagueTrades(lg, teams) {
     });
     if (!ok) return;
     const ms = tr.date ? new Date(tr.date + 'T12:00:00').getTime() : 0;
-    out.trades.push({ d: ms, items, league: true });
+    const proc = tr.processes ? new Date(tr.processes).getTime() : 0;
+    out.trades.push({ d: ms, items, league: true, pending: proc > Date.now() || undefined, processes: proc || undefined });
   });
   /* Picks in trades the user added by hand move too, oldest first. */
   (lg.manualTrades || []).slice().sort((a, b) => (a.d || 0) - (b.d || 0)).forEach(t => (t.items || []).forEach(([pid, , to]) => { if (typeof pid === 'string' && /^pk/.test(pid)) out.pickOwners[pid] = to; }));
@@ -83,7 +84,7 @@ function tradeGrades(m) {
     const top = rows[0], second = rows[1] || { v: 0 };
     const margin = top.v ? (top.v - second.v) / top.v : 0;
     const grade = margin < 0.07 ? 'Even' : margin < 0.2 ? 'Edge' : 'Win';
-    return { d: x.d, rows, winner: margin < 0.07 ? null : top.team, margin, grade, manual: x.manual || null, pending: !!x.pending, league: !!x.league };
+    return { d: x.d, rows, winner: margin < 0.07 ? null : top.team, margin, grade, manual: x.manual || null, pending: !!x.pending, processes: x.processes || null, league: !!x.league };
   });
 }
 
