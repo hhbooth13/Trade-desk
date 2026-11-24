@@ -260,7 +260,7 @@ function renderHeader() {
     $('#valuesNote').innerHTML = 'FantasyCalc ' + esc(src.type) + ' values · ' + esc(src.desc) + ' · ' + when(src.asOf) +
       ' · <span class="savemode">' + (store.mode === 'account' ? 'Saved to your Claude account' : 'Saved in this browser') + '</span>';
   }
-  const parent = ui.view === 'outlook' ? 'league' : (subtabGroups().find(g => g.some(x => x[0] === ui.view)) || [[ui.view]])[0][0];
+  const parent = ['outlook', 'league', 'history'].includes(ui.view) ? 'league' : (subtabGroups().find(g => g.some(x => x[0] === ui.view)) || [[ui.view]])[0][0];
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === parent));
   const b = $('#banner');
   if (lg && lg.demo) b.innerHTML = '<div class="banner">You’re exploring a <b>demo league</b> built from real FantasyCalc values. <a href="#sync">Sync your ESPN leagues</a> to see your own rosters.</div>';
@@ -627,7 +627,7 @@ function viewScout() {
 /* Outlook only exists for dynasty leagues. */
 function subtabGroups() {
   const lg = S && S.leagues && S.leagues[S.active];
-  return [[['ideas', 'Trade ideas'], ['calc', 'Calculator']], [['league', 'Standings'], ['history', 'History']].concat(lg && lg.type === 'dynasty' ? [['outlook', 'Outlook']] : [])];
+  return [[['ideas', 'Trade ideas'], ['calc', 'Calculator']], lg && lg.type === 'dynasty' ? [['outlook', 'Outlook'], ['league', 'Standings'], ['history', 'History']] : [['league', 'Standings'], ['history', 'History']]];
 }
 function render() {
   ensureLeague();
@@ -642,7 +642,7 @@ function render() {
   if (v === 'team' && m && (ui.teamView == null || +ui.teamView === m.lg.myTeamId)) { try { html = changesCard(m) + html; } catch (e) {} }
   if (v === 'calc' && ui.sharedNote) { html = '<div class="banner">' + esc(ui.sharedNote) + '</div>' + html; ui.sharedNote = null; }
   const grp = subtabGroups().find(g => g.some(x => x[0] === v));
-  if (grp && v !== 'sync') html = '<nav class="subtabs" aria-label="Section views">' + grp.map(([k, label]) => '<a href="#' + k + '" class="' + (k === v ? 'on' : '') + '"' + (k === v ? ' aria-current="page"' : '') + '>' + label + '</a>').join('') + '</nav>' + html;
+  if (grp && v !== 'sync') html = '<nav class="subtabs" aria-label="Section views">' + grp.map(([k, label]) => '<a href="#' + (k === 'league' ? 'standings' : k) + '" class="' + (k === v ? 'on' : '') + '"' + (k === v ? ' aria-current="page"' : '') + '>' + label + '</a>').join('') + '</nav>' + html;
   $('#view').innerHTML = html;
   if (v === 'sync') { const a = $('#bmLink'); if (a) a.setAttribute('href', BOOKMARKLET); }
   if ((v === 'calc' || (v === 'ideas' && (ui.search.side === 't' || ui.search.side === 's'))) && ui.search.side) { const i = $('#q-' + ui.search.side); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); showResults(ui.search.side, i.value); } }
@@ -689,6 +689,10 @@ function route() {
   const q = h.match(/^calc\?t=([\w-]+)/);
   if (q) { h = 'calc'; if (openSharedTrade(q[1])) { history.replaceState(null, '', location.pathname + location.search + '#calc'); renderHeader(); } }
   const md = document.getElementById('modal'); if (md) md.hidden = true;
+  /* The League tab opens on Outlook in dynasty leagues; the Standings sub-tab uses #standings. */
+  const lgA = S.leagues[S.active];
+  if (h === 'league' && lgA && lgA.type === 'dynasty') h = 'outlook';
+  if (h === 'standings') h = 'league';
   ui.view = ['team', 'ideas', 'calc', 'weekly', 'league', 'history', 'outlook', 'scout', 'sync'].includes(h) ? h : 'team';
   render();
   window.scrollTo(0, 0);
