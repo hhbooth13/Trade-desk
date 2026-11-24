@@ -180,7 +180,19 @@ function avatar(p, size) {
   const abbr = String(p.team || '').toUpperCase().replace(/^WSH$/, 'WAS');
   if (!TEAM_COLORS[abbr]) return '<span class="av fa ' + (size || '') + '" aria-hidden="true">FA</span>';
   const [c1, c2] = teamColors(abbr);
-  return '<span class="av crest ' + (size || '') + (abbr.length > 2 ? ' l3' : '') + '" style="--c1:' + c1 + ';--c2:' + c2 + '" aria-hidden="true">' + esc(abbr) + '</span>';
+  return jerseyIcon(p, abbr, c1, c2, size);
+}
+/* Mini jersey in the player's team colors with his number (or the team abbreviation when the number isn't known). */
+function jerseyIcon(p, abbr, c1, c2, size) {
+  const num = JERSEYS && JERSEYS.n && p.espn ? JERSEYS.n[String(p.espn)] : null;
+  const label = num != null ? String(num) : abbr;
+  const fs = num != null ? (label.length > 1 ? 15 : 17) : (label.length > 2 ? 9 : 11);
+  const light = /^#(f|e|d)/i.test(c1) || c1.toUpperCase() === '#FFB612';
+  return '<span class="av jersey ' + (size || '') + '" aria-hidden="true"><svg viewBox="0 0 40 40" width="100%" height="100%">' +
+    '<path d="M14 4.5 L17 3 Q20 6.2 23 3 L26 4.5 L36.5 10 L33 18.5 L29.5 17 L29.5 37 L10.5 37 L10.5 17 L7 18.5 L3.5 10 Z" fill="' + c1 + '" stroke="' + c2 + '" stroke-width="1.6" stroke-linejoin="round"/>' +
+    '<path d="M17 3 Q20 6.2 23 3 L21.6 7.6 Q20 8.6 18.4 7.6 Z" fill="' + c2 + '"/>' +
+    '<path d="M5.4 13.6 L9.2 15.4 M34.6 13.6 L30.8 15.4" stroke="' + c2 + '" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<text x="20" y="' + (num != null ? 28.5 : 26.5) + '" text-anchor="middle" font-family="var(--display)" font-weight="800" font-size="' + fs + '" fill="' + (light ? '#111' : '#fff') + '" stroke="' + c2 + '" stroke-width="' + (num != null ? 0.9 : 0.5) + '" paint-order="stroke">' + esc(label) + '</text></svg></span>';
 }
 function teamBadge(abbr) {
   if (!abbr || abbr === 'FA') return '<span class="tb" style="background:#3a3d44">FA</span>';

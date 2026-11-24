@@ -150,6 +150,29 @@ def refresh_players():
     print('ESPN players:', len(rows))
 
 
+def refresh_jerseys():
+    """Jersey numbers for every NFL roster (ESPN team rosters use the same player ids as fantasy)."""
+    out = {}
+    for tid in list(range(1, 31)) + [33, 34]:
+        url = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/%d/roster' % tid
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30) as r:
+                j = json.loads(r.read().decode('utf-8'))
+        except Exception as e:  # noqa: BLE001
+            print('roster', tid, 'unavailable', e)
+            continue
+        for g in j.get('athletes') or []:
+            for a in g.get('items') or []:
+                pos = ((a.get('position') or {}).get('abbreviation') or '')
+                if pos in ('QB', 'RB', 'WR', 'TE', 'K', 'FB') and a.get('jersey') not in (None, ''):
+                    out[str(a['id'])] = str(a['jersey'])
+    if len(out) < 300:
+        print('Jersey list looks incomplete (%d); keeping previous file' % len(out))
+        return
+    json.dump({'asOf': date.today().isoformat(), 'n': out}, open(os.path.join(SRC, 'jerseys.json'), 'w'), separators=(',', ':'))
+    print('Jerseys:', len(out))
+
+
 def refresh_prospects():
     js = open(os.path.join(SRC, 'rookies.js')).read()
     rows = re.findall(r"^  \['((?:[^'\\]|\\.)*)', '(QB|RB|WR|TE)', '((?:[^'\\]|\\.)*)'", js, re.M)
@@ -176,4 +199,5 @@ def refresh_prospects():
 if __name__ == '__main__':
     refresh_values()
     refresh_players()
+    refresh_jerseys()
     refresh_prospects()

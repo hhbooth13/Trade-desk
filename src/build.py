@@ -12,12 +12,13 @@ live = json.dumps(opt_json('rookie_stats.json', None), separators=(',', ':'), en
 news = json.dumps(opt_json('news.json', {'items': []}), separators=(',', ':'), ensure_ascii=False)
 allp = json.dumps(opt_json('players.json', None), separators=(',', ':'), ensure_ascii=False)
 boards = rd('boards.js')
+jerseys = rd('jerseys.json') if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'jerseys.json')) else 'null'
 league_trades = json.dumps(json.loads(rd('trades.json'))['trades'])
 def make(pwa):
     ui = rd('ui.js')
     ui = (ui.replace('__SEED_R__', json.dumps(rd('seed_redraft.txt'))).replace('__SEED_D__', json.dumps(rd('seed_dynasty.txt')))
             .replace('__BM__', json.dumps(bm)).replace('__PWA__', 'true' if pwa else 'false').replace('__NEWS__', news))
-    r = rook.replace('__ROOKIE_LIVE__', live) + '\n' + boards + '\nconst ALLPLAYERS = ' + allp + ';\nconst LEAGUE_TRADES = ' + league_trades + ';'
+    r = rook.replace('__ROOKIE_LIVE__', live) + '\n' + boards + '\nconst ALLPLAYERS = ' + allp + ';\nconst LEAGUE_TRADES = ' + league_trades + ';\nconst JERSEYS = ' + jerseys + ';'
     html = rd('app.template.html').replace('/*CORE*/', core).replace('/*ROOKIES*/', feat + '\n' + r + '\n' + sync + '\n' + ui2).replace('/*UI*/', ui)
     assert '</script' not in core + ui + feat + r + ui2 + sync
     if pwa:
