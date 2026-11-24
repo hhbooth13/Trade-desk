@@ -2246,14 +2246,26 @@ async function loadLive(p) {
         if (pyd != null && +pyd) bits.push(pyd + ' pass yds' + (+ptd ? ', ' + ptd + ' TD' : ''));
         if (car != null && +car) bits.push(car + '-' + ryd + (+rtd ? ', ' + rtd + ' TD' : ''));
         if (rec != null && +rec) bits.push(rec + ' rec ' + cyd + ' yds' + (+ctd ? ', ' + ctd + ' TD' : ''));
+        const fg = pick(row, 'fieldGoalsMade-fieldGoalAttempts'), xp = pick(row, 'extraPointsMade-extraPointAttempts'), lng = pick(row, 'longFieldGoalMade');
+        if (fg != null || xp != null) return 'FG ' + (fg || '0-0') + (lng && +lng ? ', long ' + lng : '') + ' · XP ' + (xp || '0-0');
         return bits.join(' · ') || labels.slice(0, 3).map((l, i) => l + ' ' + row.stats[i]).join(' · ');
       };
       /* Standard PPR: 1 per catch, 0.1 per rush/rec yard, 0.04 per pass yard, 6 per rush/rec TD, 4 per pass TD, -2 per INT or lost fumble. */
       const num = v => { const x = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(x) ? x : 0; };
       const ppr = row => { const g = k => num(pick(row, k)); return g('passingYards') * 0.04 + g('passingTouchdowns') * 4 - g('interceptions') * 2 + g('rushingYards') * 0.1 + g('rushingTouchdowns') * 6 + g('receptions') + g('receivingYards') * 0.1 + g('receivingTouchdowns') * 6 - g('fumblesLost') * 2; };
-      const skill = SKILL.includes(p.pos);
-      const shown = evs.slice(0, 5), avg = skill ? shown.reduce((s, r) => s + ppr(r), 0) / shown.length : 0;
-      games = '<h3 class="mt">Last ' + Math.min(5, evs.length) + ' games' + (skill ? ' · ' + avg.toFixed(1) + ' PPR avg' : '') + '</h3><table class="roster"><tbody>' + shown.map(row => { const e = (gl.events || {})[row.eventId] || {}; return '<tr><td class="slot">Wk ' + (e.week || '') + '</td><td class="small">' + esc((e.atVs || '') + ' ' + ((e.opponent || {}).abbreviation || '')) + ' <span class="' + (e.gameResult === 'W' ? 'pos-d' : 'neg-d') + '">' + esc((e.gameResult || '') + ' ' + (e.score || '')) + '</span></td><td class="small">' + esc(line(row)) + '</td>' + (skill ? '<td class="num"><b class="ppr' + (ppr(row) >= 20 ? ' hi' : ppr(row) < 8 ? ' lo' : '') + '">' + ppr(row).toFixed(1) + '</b><div class="small muted">PPR</div></td>' : '') + '</tr>'; }).join('') + '</tbody></table>';
+      /* Kickers (ESPN standard): FG 0-39 = 3, 40-49 = 4, 50+ = 5, XP = 1, each missed FG or XP = -1. */
+      const split = (row, k) => { const v = String(pick(row, k) || '0-0').split('-'); return [num(v[0]), num(v[1])]; };
+      const kpts = row => {
+        let pts = 0;
+        [['fieldGoalsMade1_19-fieldGoalAttempts1_19', 3], ['fieldGoalsMade20_29-fieldGoalAttempts20_29', 3], ['fieldGoalsMade30_39-fieldGoalAttempts30_39', 3], ['fieldGoalsMade40_49-fieldGoalAttempts40_49', 4], ['fieldGoalsMade50-fieldGoalAttempts50', 5]].forEach(([k, v]) => { const [m, a] = split(row, k); pts += m * v - (a - m); });
+        const [xm, xa] = split(row, 'extraPointsMade-extraPointAttempts'); pts += xm - (xa - xm);
+        return pts;
+      };
+      const isK = p.pos === 'K' || names.includes('extraPointsMade-extraPointAttempts');
+      const fpts = row => isK ? kpts(row) : ppr(row);
+      const skill = SKILL.includes(p.pos) || isK;
+      const shown = evs.slice(0, 5), avg = skill ? shown.reduce((s, r) => s + fpts(r), 0) / shown.length : 0;
+      games = '<h3 class="mt">Last ' + Math.min(5, evs.length) + ' games' + (skill ? ' · ' + avg.toFixed(1) + (isK ? ' pts avg' : ' PPR avg') : '') + '</h3><table class="roster"><tbody>' + shown.map(row => { const e = (gl.events || {})[row.eventId] || {}; return '<tr><td class="slot">Wk ' + (e.week || '') + '</td><td class="small">' + esc((e.atVs || '') + ' ' + ((e.opponent || {}).abbreviation || '')) + ' <span class="' + (e.gameResult === 'W' ? 'pos-d' : 'neg-d') + '">' + esc((e.gameResult || '') + ' ' + (e.score || '')) + '</span></td><td class="small">' + esc(line(row)) + '</td>' + (skill ? '<td class="num"><b class="ppr' + (fpts(row) >= (isK ? 12 : 20) ? ' hi' : fpts(row) < (isK ? 5 : 8) ? ' lo' : '') + '">' + fpts(row).toFixed(isK ? 0 : 1) + '</b><div class="small muted">' + (isK ? 'pts' : 'PPR') + '</div></td>' : '') + '</tr>'; }).join('') + '</tbody></table>';
     }
     el.innerHTML = (bio ? '<p class="small muted">' + esc(bio) + '</p>' : '') + (parts.length ? '<h3 class="mt">' + (season || '') + ' season' + (gp.GP ? ' · ' + gp.GP + ' games' : '') + '</h3><p class="small">' + parts.map(esc).join('<br>') + '</p>' : '') + games + '<p class="small muted">Live from ESPN.</p>';
   } catch (e) { el.innerHTML = '<p class="muted small">Couldn’t load ESPN stats right now.</p>'; }
