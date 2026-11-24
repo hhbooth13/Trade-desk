@@ -229,7 +229,8 @@ function renderHeader() {
     $('#valuesNote').innerHTML = 'FantasyCalc ' + esc(src.type) + ' values · ' + esc(src.desc) + ' · ' + when(src.asOf) +
       ' · <span class="savemode">' + (store.mode === 'account' ? 'Saved to your Claude account' : 'Saved in this browser') + '</span>';
   }
-  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === ui.view));
+  const parent = (SUBTABS.find(g => g.some(x => x[0] === ui.view)) || [[ui.view]])[0][0];
+  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.v === parent));
   const b = $('#banner');
   if (lg && lg.demo) b.innerHTML = '<div class="banner">You’re exploring a <b>demo league</b> built from real FantasyCalc values. <a href="#sync">Sync your ESPN leagues</a> to see your own rosters.</div>';
   else if (lg && lg.myTeamId == null) b.innerHTML = '<div class="banner warn">Which team is yours? ' + teamSelect('setMine', null, 'Pick your team') + '</div>';
@@ -589,6 +590,8 @@ function viewScout() {
 }
 
 /* ----- main render ----- */
+/* Bottom bar has five tabs; Trades and League each hold two views switched from the top of the page. */
+const SUBTABS = [[['ideas', 'Trade ideas'], ['calc', 'Calculator']], [['league', 'Standings'], ['history', 'History']]];
 function render() {
   ensureLeague();
   renderHeader();
@@ -598,6 +601,8 @@ function render() {
   try {
     html = v === 'weekly' ? viewWeekly(m) : v === 'scout' ? viewScout() : v === 'sync' ? viewSync() : v === 'ideas' ? viewIdeas(m) : v === 'calc' ? viewCalc(m) : v === 'league' ? viewLeague(m) : v === 'history' ? viewHistory(m) : viewTeam(m);
   } catch (e) { html = '<section class="card"><h2>Something went wrong</h2><p>' + esc(e.message) + '</p><p>Try syncing the league again.</p></section>'; }
+  const grp = SUBTABS.find(g => g.some(x => x[0] === v));
+  if (grp && v !== 'sync') html = '<nav class="subtabs" aria-label="Section views">' + grp.map(([k, label]) => '<a href="#' + k + '" class="' + (k === v ? 'on' : '') + '"' + (k === v ? ' aria-current="page"' : '') + '>' + label + '</a>').join('') + '</nav>' + html;
   $('#view').innerHTML = html;
   if (v === 'sync') { const a = $('#bmLink'); if (a) a.setAttribute('href', BOOKMARKLET); }
   if ((v === 'calc' || (v === 'ideas' && (ui.search.side === 't' || ui.search.side === 's'))) && ui.search.side) { const i = $('#q-' + ui.search.side); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); showResults(ui.search.side, i.value); } }
