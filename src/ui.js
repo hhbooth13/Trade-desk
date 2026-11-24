@@ -386,7 +386,7 @@ function viewCalc(m) {
       const dB = lineup(swapPlayers(tB.players, pb, A.filter(p => SKILL.includes(p.pos))), m.lg.slots).value - tB.starterValue;
       verdict += '<div class="impact big"><span class="' + (dA >= 0 ? 'pos-d' : 'neg-d') + '">' + teamName(tA) + ' starters ' + sgn(dA) + '</span><span class="' + (dB >= 0 ? 'pos-d' : 'neg-d') + '">' + teamName(tB) + ' starters ' + sgn(dB) + '</span></div>';
     }
-    verdict += '<div class="v-actions"><button class="btn ghost" data-act="swapSides">Swap sides</button><button class="btn ghost" data-act="clearCalc">Clear</button></div></section>';
+    verdict += '<div class="v-actions"><button class="btn" data-act="shareTrade">Share trade</button><button class="btn ghost" data-act="swapSides">Swap sides</button><button class="btn ghost" data-act="clearCalc">Clear</button></div></section>';
   } else if (B.length && tA) {
     const target = f.tb, ex = new Set(c.b);
     const pk = findPackages(tA.players.concat(tA.picks), B.map(p => p.value), m.lg.slots, tA.starterValue, ex);
@@ -598,14 +598,15 @@ function viewScout() {
     return '<li><b>' + esc(p.name) + '</b> (overall pick ' + k + '): ' + (r ? 'your board says ' + esc(r[0]) + '. Likely range: ' + range : 'past the end of this board') + '</li>';
   }).join('');
   const chips = ['', 'QB', 'RB', 'WR', 'TE'].map(p => '<button class="chip' + (f === p ? ' on' : '') + '" data-act="scoutPos" data-pos="' + p + '">' + (p || 'All') + '</button>').join('');
-  const modeChips = '<button class="chip' + (ui.scoutMode !== 'mock' ? ' on' : '') + '" data-act="scoutMode" data-mode="board">Board</button><button class="chip' + (ui.scoutMode === 'mock' ? ' on' : '') + '" data-act="scoutMode" data-mode="mock">Mock draft</button>';
+  const sm = ui.scoutMode || 'board';
+  const modeChips = [['board', 'Board'], ['mock', 'Mock draft'], ['live', 'Draft day']].map(([k, l]) => '<button class="chip' + (sm === k ? ' on' : '') + '" data-act="scoutMode" data-mode="' + k + '">' + l + '</button>').join('');
   const boardChips = '<button class="chip' + (!mineBoard ? ' on' : '') + '" data-act="board" data-b="consensus">Consensus</button><button class="chip' + (mineBoard ? ' on' : '') + '" data-act="board" data-b="mine">My board</button>';
   return '<section class="head-row"><h2>' + year + ' rookie scouting</h2><div class="ctrl">' + modeChips + '<span style="width:8px"></span>' + boardChips + '</div></section>' +
-    '<p class="muted small lead">' + ROOKIES.length + ' prospects for next spring\u2019s 1QB dynasty draft. Rankings as of ' + ROOKIE_ASOF + (ROOKIE_STATS_ASOF ? '; stats updated ' + when(ROOKIE_STATS_ASOF + 'T12:00:00') : '') + ', with size and 2026 stats from ESPN and ages from Wikipedia birth dates (green = young for the class, which dynasty players prize). Each player is matched to the pick where he\u2019d go in ' + (lg ? esc(lg.name) + '\u2019s' : 'a 12-team') + ' ' + rounds + '-round linear draft, and your picks are highlighted. ' +
-    (mineBoard ? 'Use the arrows to build your own board. Arrows next to the rank show how far you moved a player from consensus.' : 'Switch to My board to rank them your way.') + '</p>' +
-    (lg ? (myTargets ? '<section class="card"><h3>Your ' + year + ' picks</h3><ul class="why">' + myTargets + '</ul></section>' : (mine == null ? '<section class="card"><p>Pick your team on the Sync tab to see where your picks land.</p></section>' : '')) : '<section class="card"><p>Set one of your leagues to Dynasty on the Sync tab to match this board to your picks.</p></section>') +
-    '<div class="row mt">' + chips + (mineBoard ? '<button class="btn ghost" data-act="resetBoard">Reset to consensus</button>' : '') + '</div>' +
-    (ui.scoutMode === 'mock' && m ? '<div class="mt">' + mockCard(m) + '</div>' : '<div class="prospects mt">' + rows + '</div>') +
+    (sm === 'live' ? '<p class="muted small lead">Draft day: tap <b>Draft</b> as each pick comes in. The order comes from the final standings with every traded pick, and suggestions lean toward each team\u2019s needs.' + (ui.board === 'mine' ? ' Your picks follow your board.' : '') + '</p>' : '<p class="muted small lead">' + ROOKIES.length + ' prospects for next spring\u2019s 1QB dynasty draft. Rankings as of ' + ROOKIE_ASOF + (ROOKIE_STATS_ASOF ? '; stats updated ' + when(ROOKIE_STATS_ASOF + 'T12:00:00') : '') + ', with size and 2026 stats from ESPN and ages from Wikipedia birth dates (green = young for the class, which dynasty players prize). Each player is matched to the pick where he\u2019d go in ' + (lg ? esc(lg.name) + '\u2019s' : 'a 12-team') + ' ' + rounds + '-round linear draft, and your picks are highlighted. ' +
+    (mineBoard ? 'Use the arrows to build your own board. Arrows next to the rank show how far you moved a player from consensus.' : 'Switch to My board to rank them your way.') + '</p>') +
+    (sm === 'live' ? '' : lg ? (myTargets ? '<section class="card"><h3>Your ' + year + ' picks</h3><ul class="why">' + myTargets + '</ul></section>' : (mine == null ? '<section class="card"><p>Pick your team on the Sync tab to see where your picks land.</p></section>' : '')) : '<section class="card"><p>Set one of your leagues to Dynasty on the Sync tab to match this board to your picks.</p></section>') +
+    (sm === 'live' ? '' : '<div class="row mt">' + chips + (mineBoard ? '<button class="btn ghost" data-act="resetBoard">Reset to consensus</button>' : '') + '</div>') +
+    (sm === 'mock' && m ? '<div class="mt">' + mockCard(m) + '</div>' : sm === 'live' && m ? '<div class="mt">' + liveDraftCard(m) + '</div>' : '<div class="prospects mt">' + rows + '</div>') +
     '<p class="muted small mt">Rankings blend these boards, adjusted for 1QB scoring and 2026 production: ' + ROOKIE_SOURCES.map(s => '<a href="' + s[1] + '" target="_blank" rel="noopener">' + esc(s[0]) + '</a>').join(' · ') + '. Official 40 times come at the NFL Combine in late February. Ask Claude to refresh the board after bowl season and the Combine.</p>';
 }
 
@@ -621,6 +622,8 @@ function render() {
   try {
     html = v === 'weekly' ? viewWeekly(m) : v === 'scout' ? viewScout() : v === 'sync' ? viewSync() : v === 'ideas' ? viewIdeas(m) : v === 'calc' ? viewCalc(m) : v === 'league' ? viewLeague(m) : v === 'history' ? viewHistory(m) : viewTeam(m);
   } catch (e) { html = '<section class="card"><h2>Something went wrong</h2><p>' + esc(e.message) + '</p><p>Try syncing the league again.</p></section>'; }
+  if (v === 'team' && m && (ui.teamView == null || +ui.teamView === m.lg.myTeamId)) { try { html = changesCard(m) + html; } catch (e) {} }
+  if (v === 'calc' && ui.sharedNote) { html = '<div class="banner">' + esc(ui.sharedNote) + '</div>' + html; ui.sharedNote = null; }
   const grp = SUBTABS.find(g => g.some(x => x[0] === v));
   if (grp && v !== 'sync') html = '<nav class="subtabs" aria-label="Section views">' + grp.map(([k, label]) => '<a href="#' + k + '" class="' + (k === v ? 'on' : '') + '"' + (k === v ? ' aria-current="page"' : '') + '>' + label + '</a>').join('') + '</nav>' + html;
   $('#view').innerHTML = html;
@@ -665,7 +668,10 @@ function showResults(side, q) {
 
 /* ----- events ----- */
 function route() {
-  const h = (location.hash || '').replace('#', '');
+  let h = (location.hash || '').replace('#', '');
+  const q = h.match(/^calc\?t=([\w-]+)/);
+  if (q) { h = 'calc'; if (openSharedTrade(q[1])) { history.replaceState(null, '', location.pathname + location.search + '#calc'); renderHeader(); } }
+  const md = document.getElementById('modal'); if (md) md.hidden = true;
   ui.view = ['team', 'ideas', 'calc', 'weekly', 'league', 'history', 'scout', 'sync'].includes(h) ? h : 'team';
   render();
   window.scrollTo(0, 0);

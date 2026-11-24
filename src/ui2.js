@@ -326,3 +326,167 @@ document.addEventListener('click', e => {
   else if (el.dataset.act === 'gplayer') { openPlayer(el.dataset.id); }
   else if (el.dataset.act === 'gsearch') { openSearch(); }
 });
+
+/* ======================= 1. Share a trade ======================= */
+const APP_URL = 'https://hhbooth13.github.io/Trade-desk/';
+const b64u = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
+function shareTrade() {
+  const m = model(), c = ui.calc;
+  const A = c.a.map(id => asset(m, id)).filter(Boolean), B = c.b.map(id => asset(m, id)).filter(Boolean);
+  if (!A.length || !B.length) return;
+  const f = fairness(A, B);
+  const tA = m.byId.get(+c.aTeam), tB = m.byId.get(+c.bTeam);
+  const payload = { v: 1, l: m.lg.demo ? null : String(m.lg.id), a: c.a, b: c.b, ta: tA ? tA.id : null, tb: tB ? tB.id : null };
+  const url = APP_URL + '#calc?t=' + b64u(JSON.stringify(payload));
+  const nm = (t, d) => t ? t.name : d;
+  const text = nm(tA, 'Side A') + ' gives ' + A.map(p => p.name).join(' + ') + '\n' + nm(tB, 'Side B') + ' gives ' + B.map(p => p.name).join(' + ') +
+    '\nTrade Desk value: ' + fmt(f.ta) + ' vs ' + fmt(f.tb) + (f.adjA || f.adjB ? ' (incl. waiver adjustment)' : '') + '\n';
+  const d = $('#modal');
+  d.innerHTML = '<div class="modal-card sheet" role="dialog" aria-modal="true" aria-labelledby="shh"><div class="sheet-head"><div><h3 id="shh">Share this trade</h3><div class="small muted">Anyone with the app opens the same trade, valued for their league.</div></div><button class="x sheet-x" id="pClose" aria-label="Close">×</button></div>' +
+    '<pre class="share-text">' + esc(text) + '</pre><input id="shUrl" type="text" readonly value="' + esc(url) + '" style="width:100%">' +
+    '<div class="row"><button class="btn" id="shGo">' + (navigator.share ? 'Share…' : 'Copy link') + '</button>' + (navigator.share ? '<button class="btn ghost" id="shCopy">Copy link</button>' : '') + '<span class="small muted" id="shMsg"></span></div></div>';
+  d.hidden = false;
+  const close = () => { d.hidden = true; };
+  $('#pClose').onclick = close; d.onclick = e => { if (e.target === d) close(); };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text + url); $('#shMsg').textContent = 'Copied. Paste it in your group chat.'; }
+    catch (e) { const i = $('#shUrl'); i.focus(); i.select(); $('#shMsg').textContent = 'Press copy on the highlighted link.'; }
+  };
+  $('#shGo').onclick = async () => { if (navigator.share) { try { await navigator.share({ title: 'Trade idea', text, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; } } copy(); };
+  if ($('#shCopy')) $('#shCopy').onclick = copy;
+}
+/* Opening a shared link: #calc?t=... loads the trade into the calculator. */
+function openSharedTrade(code) {
+  let p; try { p = JSON.parse(unb64u(code)); } catch (e) { return false; }
+  if (!p || !Array.isArray(p.a) || !Array.isArray(p.b)) return false;
+  if (p.l && S.leagues[p.l]) S.active = p.l;
+  const m = model();
+  const ok = id => !!asset(m, id);
+  const a = p.a.filter(ok), b = p.b.filter(ok);
+  ui.calc = { a, b, aTeam: m.byId.get(p.ta) ? p.ta : null, bTeam: m.byId.get(p.tb) ? p.tb : null };
+  ui.sharedNote = (a.length < p.a.length || b.length < p.b.length) ? 'Some of the shared players or picks aren’t in your current league, so they were left out.' + (p.l && !S.leagues[p.l] ? ' Sync that league to see the whole trade.' : '') : 'Shared trade loaded.';
+  return true;
+}
+
+/* ======================= 2. What changed ======================= */
+function seenSnapshot(m) {
+  const vals = {};
+  m.teams.forEach(t => t.players.concat(t.picks || []).forEach(p => { vals[p.id] = p.value; }));
+  const me = m.byId.get(m.lg.myTeamId);
+  const blockKeys = []; (blockOf(m.lg).sell || []).forEach(id => { const p = m.players.get(id); if (p) m.teams.forEach(t => { if (me && t.id !== me.id && t.needs.includes(p.pos)) blockKeys.push(id + ':' + t.id); }); });
+  return { t: Date.now(), block: blockKeys, vals, trades: tradeGrades(m).map(g => g.rows.map(r => r.got.map(p => p.id).join('+')).join('|')), rank: me ? me.rank.starter : null, total: me ? me.totalValue : null };
+}
+function changesCard(m) {
+  const lg = S.leagues[m.lg.id] || m.lg;
+  const me = m.byId.get(m.lg.myTeamId);
+  if (!me || m.lg.demo) return '';
+  if (!lg.seen) { lg.seen = seenSnapshot(m); save([lg.id]); }
+  const seen = lg.seen, since = seen.t;
+  const items = [];
+  /* my players' value moves */
+  const moves = me.players.concat(me.picks || []).map(p => ({ p, d: seen.vals[p.id] != null ? p.value - seen.vals[p.id] : null })).filter(x => x.d != null && Math.abs(x.d) >= Math.max(120, 0.05 * (seen.vals[x.p.id] || 1)));
+  moves.sort((a, b) => Math.abs(b.d) - Math.abs(a.d)).slice(0, 5).forEach(x => items.push({ k: x.d > 0 ? 'up' : 'down', html: '<b>' + esc(x.p.name) + '</b> ' + (x.d > 0 ? 'rose' : 'fell') + ' <b class="' + (x.d > 0 ? 'pos-d' : 'neg-d') + '">' + (x.d > 0 ? '+' : '−') + fmt(Math.abs(x.d)) + '</b> to ' + fmt(x.p.value), id: x.p.id }));
+  /* news on rostered players */
+  const owners = new Map(); m.teams.forEach(t => t.players.forEach(p => owners.set(String(p.espn), t)));
+  ((NEWS && NEWS.items) || []).filter(n => n.date && new Date(n.date + 'T23:59:59').getTime() >= since - 864e5).forEach(n => {
+    const t = owners.get(String(n.espn)); if (!t) return;
+    items.push({ k: 'news', html: '<b>' + esc(n.name) + '</b> <span class="muted">(' + (t.id === me.id ? 'yours' : esc(t.abbrev || t.name)) + ')</span>: ' + esc(n.note), mine: t.id === me.id });
+  });
+  /* new trades in the league */
+  const seenTr = new Set(seen.trades || []);
+  tradeGrades(m).filter(g => !seenTr.has(g.rows.map(r => r.got.map(p => p.id).join('+')).join('|'))).slice(0, 4).forEach(g => {
+    items.push({ k: 'trade', html: 'New trade: ' + g.rows.map(r => '<b>' + esc(r.team ? r.team.abbrev || r.team.name : '?') + '</b> got ' + r.got.map(p => esc(p.name)).join(' + ')).join('; ') });
+  });
+  /* rank move */
+  if (seen.rank && me.rank.starter !== seen.rank) items.push({ k: me.rank.starter < seen.rank ? 'up' : 'down', html: 'Your starting lineup moved from <b>' + ord(seen.rank) + '</b> to <b>' + ord(me.rank.starter) + '</b> in the league.' });
+  /* trade block matches */
+  const sell = (blockOf(lg).sell || []).map(id => m.players.get(id)).filter(Boolean);
+  sell.forEach(p => {
+    const seenB = new Set(seen.block || []);
+    const fits = m.teams.filter(t => t.id !== me.id && t.needs.includes(p.pos) && !seenB.has(p.id + ':' + t.id));
+    if (fits.length) items.push({ k: 'block', html: '<b>' + esc(p.name) + '</b> is on your block and ' + fits.length + ' team' + (fits.length > 1 ? 's need' : ' needs') + ' a ' + p.pos + ': ' + fits.slice(0, 4).map(t => esc(t.abbrev || t.name)).join(', ') });
+  });
+  /* first visit or quiet: show the month's biggest movers on your roster instead */
+  let body;
+  if (!items.length) {
+    const tr = me.players.filter(p => p.trend).sort((a, b) => Math.abs(b.trend) - Math.abs(a.trend)).slice(0, 3);
+    body = '<p class="small muted" style="margin:0 0 6px">Nothing new since you last checked.' + (tr.length ? ' Biggest 30-day moves on your roster:' : '') + '</p>' + tr.map(p => '<div class="chg ' + (p.trend > 0 ? 'up' : 'down') + '"><b>' + esc(p.name) + '</b> <span class="' + (p.trend > 0 ? 'pos-d' : 'neg-d') + '">' + (p.trend > 0 ? '+' : '−') + fmt(Math.abs(p.trend)) + '</span> this month</div>').join('');
+  } else {
+    const icon = { up: '▲', down: '▼', news: '!', trade: '⇄', block: '★' };
+    body = items.slice(0, 10).map(x => '<div class="chg ' + x.k + '"' + (x.id ? ' data-act="player" data-id="' + esc(x.id) + '"' : '') + '><i>' + icon[x.k] + '</i><span>' + x.html + '</span></div>').join('');
+  }
+  return '<section class="card changes"><div class="row" style="justify-content:space-between;margin:0 0 8px"><h3 style="margin:0">What changed' + (items.length ? ' <span class="cnt">' + items.length + '</span>' : '') + '</h3>' +
+    '<span class="small muted">' + (items.length ? 'since your last check, ' + ago(since) : 'checked ' + ago(since)) + (items.length ? ' · <button class="link small" data-act="seenAll">Mark all seen</button>' : '') + '</span></div>' + body + '</section>';
+}
+
+/* ======================= 3. Live rookie draft ======================= */
+function liveDraftCard(m) {
+  const lg = S.leagues[m.lg.id] || m.lg;
+  const year = m.picks.length ? m.picks[0].year : null;
+  if (!year) return '<section class="card"><p>Set a league to Dynasty on the Sync tab to run draft day.</p></section>';
+  const picks = m.picks.filter(p => p.year === year).sort((a, b) => a.round - b.round || a.pickNo - b.pickNo);
+  const st = lg.liveDraft && lg.liveDraft.year === year ? lg.liveDraft : (lg.liveDraft = { year, made: [] });
+  const made = st.made, i = made.length;
+  const taken = new Set(made.map(x => x.name));
+  const consensus = ROOKIES.filter(r => !taken.has(r[0]));
+  const myOrder = (ui.board === 'mine' ? rookieOrder() : ROOKIES).filter(r => !taken.has(r[0]));
+  const lbl = pk => pk.round + '.' + String(pk.pickNo).padStart(2, '0');
+  const tn = t => t ? esc(t.abbrev || t.name) : '?';
+  const log = made.map((x, k) => { const pk = picks[k], t = pk && m.byId.get(pk.owner); return '<div class="ld-row' + (pk && pk.owner === m.lg.myTeamId ? ' me' : '') + '"><span class="pk">' + (pk ? lbl(pk) : '') + '</span>' + (t ? fteamAvatar(t, 'xs') : '') + '<span class="ld-t">' + tn(t) + '</span>' + (x.pos ? posChip(x.pos) : '') + '<b>' + esc(x.name) + '</b></div>'; }).reverse().join('');
+  const controls = '<div class="row">' + (made.length ? '<button class="btn ghost sm" data-act="ldUndo">Undo last pick</button><button class="btn ghost danger sm" data-act="ldReset">Start over</button>' : '') + '</div>';
+  if (i >= picks.length) {
+    const mineHaul = made.filter((x, k) => picks[k].owner === m.lg.myTeamId);
+    return '<section class="card ld"><h3>Draft complete</h3><p>Your picks: ' + (mineHaul.map(x => '<b>' + esc(x.name) + '</b>').join(', ') || 'none') + '</p>' + controls + '<div class="ld-log">' + log + '</div></section>';
+  }
+  const pk = picks[i], t = m.byId.get(pk.owner), isMe = pk.owner === m.lg.myTeamId;
+  const myNext = picks.findIndex((p, k) => k >= i && p.owner === m.lg.myTeamId);
+  const one = m.lg.qbs !== 2;
+  const pool = isMe ? myOrder : consensus;
+  const rank = new Map(pool.map((r, k) => [r[0], k]));
+  const scored = pool.slice(0, 40).map(r => {
+    let v = 1000 * Math.exp(-rank.get(r[0]) / 16);
+    if (!isMe && t && t.needs.includes(r[1])) v += 45;
+    if (isMe && t && t.needs.includes(r[1])) v += 25;
+    if (one && r[1] === 'QB' && !(t && t.needs.includes('QB'))) v *= 0.85;
+    return { r, v };
+  }).sort((a, b) => b.v - a.v);
+  const why = r => { const bits = []; const cr = ROOKIES.indexOf(r) + 1; bits.push('#' + cr + ' overall'); if (t && t.needs.includes(r[1])) bits.push('fills a ' + r[1] + ' need'); const br = boardRanks(r[0]); if (br.dyn) bits.push('boards avg #' + br.dyn.avg.toFixed(1)); return bits.join(' · '); };
+  const best = scored.slice(0, 4).map((x, k) => '<div class="ld-pick' + (k === 0 ? ' top' : '') + '"><div class="ld-pm">' + posChip(x.r[1]) + '<b class="link" data-act="prospect" data-name="' + esc(x.r[0]) + '">' + esc(x.r[0]) + '</b><div class="small muted">' + esc(x.r[2]) + ' · ' + why(x.r) + '</div></div><button class="btn sm" data-act="ldPick" data-name="' + esc(x.r[0]) + '">Draft</button></div>').join('');
+  const f = ui.ldPos || '';
+  const rest = consensus.filter(r => !f || r[1] === f).map(r => '<div class="ld-av">' + '<span class="num muted">' + (ROOKIES.indexOf(r) + 1) + '</span>' + posChip(r[1]) + '<b class="link" data-act="prospect" data-name="' + esc(r[0]) + '">' + esc(r[0]) + '</b><span class="small muted">' + esc(r[2]) + '</span><button class="btn ghost sm" data-act="ldPick" data-name="' + esc(r[0]) + '">Draft</button></div>').join('');
+  return '<section class="card ld' + (isMe ? ' mine' : '') + '"><div class="ld-clock"><span class="ld-lbl">' + (isMe ? 'You’re on the clock' : 'On the clock') + '</span><div class="ld-team">' + fteamAvatar(t, 'lg') + '<div><div class="ld-pkno">Pick ' + lbl(pk) + ' <span class="muted small">(' + (i + 1) + ' of ' + picks.length + ')</span></div><h2>' + (t ? esc(t.name) : '?') + '</h2>' +
+    (t && t.needs.length ? '<div class="small muted">Needs ' + t.needs.join(', ') + '</div>' : '') + '</div></div>' +
+    (!isMe ? '<div class="small">' + (myNext >= 0 ? 'Your next pick: <b>' + lbl(picks[myNext]) + '</b>, ' + (myNext - i === 1 ? 'right after this one' : (myNext - i) + ' picks away') : 'You have no picks left in this draft.') + '</div>' : '') + '</div>' +
+    '<h3 class="mt">' + (isMe ? 'Best for you' + (ui.board === 'mine' ? ' (your board)' : '') : 'Most likely picks') + '</h3>' + best +
+    '<div class="row mt" style="gap:6px"><input id="ldOther" type="text" placeholder="Picked someone not listed? Type the name" style="flex:1;min-width:160px"><button class="btn ghost sm" data-act="ldOther">Add</button></div>' +
+    controls + '</section>' +
+    '<section class="card mt"><div class="row" style="justify-content:space-between;margin:0 0 6px"><h3 style="margin:0">Best available</h3><div class="ctrl">' + ['', 'QB', 'RB', 'WR', 'TE'].map(p => '<button class="chip sm' + (f === p ? ' on' : '') + '" data-act="ldPos" data-pos="' + p + '">' + (p || 'All') + '</button>').join('') + '</div></div><div class="ld-list">' + (rest || '<p class="muted small">Nobody left at that position.</p>') + '</div></section>' +
+    (log ? '<section class="card mt"><h3>Picks so far</h3><div class="ld-log">' + log + '</div></section>' : '');
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const a = el.dataset.act;
+  if (a === 'shareTrade') shareTrade();
+  else if (a === 'seenAll') { const m = model(); const lg = S.leagues[S.active]; lg.seen = seenSnapshot(m); save([lg.id]); render(); }
+  else if (a === 'ldPos') { ui.ldPos = el.dataset.pos; render(); }
+  else if (a === 'ldPick' || a === 'ldOther') {
+    const lg = S.leagues[S.active]; const m = model();
+    const name = a === 'ldOther' ? ($('#ldOther').value || '').trim() : el.dataset.name;
+    if (!name || !lg.liveDraft) return;
+    const r = ROOKIES.find(x => nk(x[0]) === nk(name));
+    lg.liveDraft.made.push({ name: r ? r[0] : name, pos: r ? r[1] : '' });
+    save([lg.id]); render();
+  }
+  else if (a === 'ldUndo') { const lg = S.leagues[S.active]; if (lg.liveDraft) { lg.liveDraft.made.pop(); save([lg.id]); render(); } }
+  else if (a === 'ldReset') { const lg = S.leagues[S.active]; if (lg.liveDraft && confirmReset(el)) { lg.liveDraft.made = []; save([lg.id]); render(); } }
+});
+/* Two-tap confirm instead of a browser dialog. */
+function confirmReset(el) {
+  if (el.dataset.armed) return true;
+  el.dataset.armed = '1'; el.textContent = 'Tap again to clear all picks';
+  setTimeout(() => { if (el.isConnected) { delete el.dataset.armed; el.textContent = 'Start over'; } }, 3500);
+  return false;
+}
