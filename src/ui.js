@@ -176,9 +176,11 @@ const teamColors = abbr => { const a = String(abbr || '').toUpperCase(); return 
 const initials = n => { const w = String(n || '').replace(/\b(Jr\.?|Sr\.?|II|III|IV|V)\b/g, '').replace(/D\/ST/, '').trim().split(/\s+/).filter(w => /[A-Za-z]/.test(w)); return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); };
 function avatar(p, size) {
   if (p.pos === 'PICK') return '<span class="av pick ' + (size || '') + '">' + (p.round ? 'R' + p.round : 'PK') + '</span>';
-  const [c1, c2] = teamColors(p.team);
-  const txt = p.pos === 'D/ST' ? String(p.team || 'DST').slice(0, 3) : initials(p.name);
-  return '<span class="av ' + (size || '') + '" style="background:' + c1 + ';--ring:' + c2 + '" aria-hidden="true">' + esc(txt) + '</span>';
+  /* NFL team crest built from the team's colors and abbreviation (official logos aren't used). */
+  const abbr = String(p.team || '').toUpperCase().replace(/^WSH$/, 'WAS');
+  if (!TEAM_COLORS[abbr]) return '<span class="av fa ' + (size || '') + '" aria-hidden="true">FA</span>';
+  const [c1, c2] = teamColors(abbr);
+  return '<span class="av crest ' + (size || '') + (abbr.length > 2 ? ' l3' : '') + '" style="--c1:' + c1 + ';--c2:' + c2 + '" aria-hidden="true">' + esc(abbr) + '</span>';
 }
 function teamBadge(abbr) {
   if (!abbr || abbr === 'FA') return '<span class="tb" style="background:#3a3d44">FA</span>';
@@ -205,7 +207,7 @@ function playerLine(p, opts) {
   const est = p.est ? '<span class="estb' + (p.est === 'manual' ? ' man' : '') + '" title="' + esc(p.estWhy || '') + '">' + (p.est === 'manual' ? 'your value' : p.est === 'season' ? 'out for season' : 'est.') + '</span>' : '';
   return '<div class="pl" data-act="player" data-id="' + esc(p.id) + '" role="button" tabindex="0">' + avatar(p, opts.size) + '<div class="pl-text"><div class="pl-main"><span class="pl-name">' + esc(p.name) + '</span>' +
     (p.inj ? '<span class="inj" title="' + esc(p.inj.replace('_', ' ').toLowerCase()) + '">' + esc(INJ_SHORT[p.inj] || p.inj.slice(0, 3)) + '</span>' : '') + '</div>' +
-    '<div class="pl-meta">' + posChip(p.pos) + (p.pos === 'PICK' ? '<span>' + esc(p.team || 'Draft pick') + '</span>' : teamBadge(p.team)) + dyn + trendTag(p.trend, p.value) + est + (p.news ? '<span class="newsb" title="' + esc(p.news.note) + '">news</span>' : '') + '</div></div></div>';
+    '<div class="pl-meta">' + posChip(p.pos) + (p.pos === 'PICK' ? '<span>' + esc(p.team || 'Draft pick') + '</span>' : '') + dyn + trendTag(p.trend, p.value) + est + (p.news ? '<span class="newsb" title="' + esc(p.news.note) + '">news</span>' : '') + '</div></div></div>';
 }
 const teamName = t => esc(t ? t.name : '');
 
