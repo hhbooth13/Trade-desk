@@ -1,5 +1,13 @@
 /* ---------- Feature logic: trade grades, counters, block, history, planner, offseason, mock draft, rivals, records ---------- */
 
+/* Letter grade for one side of a trade from its value edge (share of the bigger side):
+   even trades are a B for both teams; winners climb to A+, losers fall to F-. */
+const GRADE_STEPS = [[.35, 'A+'], [.25, 'A'], [.16, 'A-'], [.09, 'B+'], [-.03, 'B'], [-.09, 'B-'], [-.16, 'C+'], [-.25, 'C'], [-.35, 'C-'], [-.45, 'D+'], [-.55, 'D'], [-.65, 'D-'], [-.8, 'F']];
+const GRADE_ORDER = ['F-', 'F', 'D-', 'D', 'D+', 'C-', 'C', 'C+', 'B-', 'B', 'B+', 'A-', 'A', 'A+'];
+function letterGrade(edge) { const s = GRADE_STEPS.find(([min]) => edge >= min); return s ? s[1] : 'F-'; }
+/* Red (F-) through yellow (C) to green (A+). */
+function gradeHue(g) { const i = GRADE_ORDER.indexOf(g), c = GRADE_ORDER.indexOf('C'); return i <= c ? Math.round(60 * i / c) : Math.round(60 + 70 * (i - c) / (GRADE_ORDER.length - 1 - c)); }
+
 /* Trades recorded in the app's data file (src/trades.json): pick trades and others ESPN doesn't report.
    Each side's team is matched by name (team or manager, ignoring doubled letters), or else by who rosters what that side received. */
 function resolveLeagueTrades(lg, teams) {
@@ -67,6 +75,10 @@ function tradeGrades(m) {
     const ids = Object.keys(sides).map(Number);
     const rows = ids.map(id => ({ team: m.byId.get(id), got: sides[id].got, v: sides[id].got.reduce((s, p) => s + p.value, 0), adj: 0 }));
     if (rows.length === 2) { const st = sideTotals(rows[0].got.map(p => p.value), rows[1].got.map(p => p.value), m.lg.type === 'dynasty'); rows[0].adj = st.adjA; rows[1].adj = st.adjB; rows[0].v = st.ta; rows[1].v = st.tb; }
+    rows.forEach(r => {
+      const others = rows.filter(x => x !== r), ov = others.reduce((s, x) => s + x.v, 0) / Math.max(1, others.length);
+      r.letter = letterGrade((r.v - ov) / Math.max(r.v, ov, 1));
+    });
     rows.sort((a, b) => b.v - a.v);
     const top = rows[0], second = rows[1] || { v: 0 };
     const margin = top.v ? (top.v - second.v) / top.v : 0;
