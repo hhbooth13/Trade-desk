@@ -302,7 +302,7 @@ function dynastyOutlook(m) {
     });
     const st = lineup(t.players, m.lg.slots).starters.map(x => x.p).filter(p => p && p.age);
     const age = st.length ? st.reduce((a, p) => a + p.age, 0) / st.length : null;
-    const sellers = t.players.filter(p => SKILL.includes(p.pos) && p.age && PEAK_AGE[p.pos] && p.age >= PEAK_AGE[p.pos] + (p.pos === 'RB' ? 1 : 2) && p.value >= 1500).sort((a, b) => b.value - a.value).slice(0, 3);
+    const sellers = t.players.filter(p => !outNow(p) && SKILL.includes(p.pos) && p.age && PEAK_AGE[p.pos] && p.age >= PEAK_AGE[p.pos] + (p.pos === 'RB' ? 1 : 2) && p.value >= 1500).sort((a, b) => b.value - a.value).slice(0, 3);
     const young = t.players.filter(p => SKILL.includes(p.pos) && p.age && p.age <= 24 && p.value >= 1500).sort((a, b) => b.value - a.value).slice(0, 3);
     return { team: t, scores, age, picks: (t.picks || []).filter(p => p.round === 1).length, sellers, young };
   });
@@ -351,7 +351,7 @@ function gamePlan(m, o, teamId) {
     buy.sort((a, b) => b.p.value - a.p.value); buy = buy.slice(0, 5);
   } else {
     const needs = t.needs.length ? t.needs : SKILL.filter(p => t.rank[p] > third);
-    others.filter(isSeller).forEach(x => x.team.players.filter(p => needs.includes(p.pos) && p.value >= 1500 && (!p.age || p.age >= 25)).forEach(p => buy.push({ p, from: x.team })));
+    others.filter(isSeller).forEach(x => x.team.players.filter(p => needs.includes(p.pos) && p.value >= 1500 && (!p.age || p.age >= 25) && !outNow(p)).forEach(p => buy.push({ p, from: x.team })));
     buy.sort((a, b) => b.p.value - a.p.value); buy = buy.slice(0, 5);
   }
   const picks = (t.picks || []).slice().sort((a, b) => a.year - b.year || a.round - b.round);
@@ -359,9 +359,11 @@ function gamePlan(m, o, teamId) {
     : dir === 'contend' ? (picks.length ? 'Your picks are trade chips. Later-year picks cost you the least today.' : 'You\u2019re out of picks to deal; use young bench players instead.')
     : 'Hold your firsts unless they bring back a clear upgrade.';
   const steps = [];
-  if (sell.length) steps.push(dir === 'rebuild' ? 'Sell ' + sell.slice(0, 2).map(p => p.name).join(' and ') + ' before age drops their value.' : 'Package ' + sell.slice(0, 2).map(p => p.name).join(' and ') + ' (bench depth) for one better starter.');
+  const healthy = sell.filter(p => !outNow(p)), hurt = sell.filter(p => outNow(p));
+  if (healthy.length) steps.push(dir === 'rebuild' ? 'Sell ' + healthy.slice(0, 2).map(p => p.name).join(' and ') + ' before age drops their value.' : 'Package ' + healthy.slice(0, 2).map(p => p.name).join(' and ') + ' (bench depth) for one better starter.');
+  if (hurt.length && dir === 'rebuild') steps.push('Hold ' + hurt.map(p => p.name).join(' and ') + ' until ' + (hurt.length > 1 ? 'they\u2019re' : 'he\u2019s') + ' healthy; win-now teams won\u2019t pay for an injured player.');
   if (buy.length) steps.push(dir === 'rebuild' ? 'Target young players like ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team trying to win now.' : 'Target ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team looking to the future.');
   if (t.needs.length && dir !== 'rebuild') steps.push('Your weakest spot' + (t.needs.length > 1 ? 's are ' : ' is ') + t.needs.join(' and ') + '. Upgrade there first.');
   steps.push(pickAdvice);
-  return { r, dir, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p) })), buy, picks };
+  return { r, dir, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p), out: outNow(p) })), buy, picks };
 }

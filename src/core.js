@@ -329,6 +329,20 @@ function combos(arr, maxPair, triples) {
 const SHAPES_OK = { '1for1': 1, '1for2': 1, '2for1': 1, '2for2': 1, '3for1': 1, '1for3': 1 };
 const assetAge = p => p.pos === 'PICK' ? 21.5 : p.age;
 const avgAssetAge = ps => { const a = ps.map(assetAge).filter(Boolean); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
+/* Out right now: on IR, ruled out, suspended, or a news item that wipes out his season (redraft factor under 0.5).
+   Win-now teams won't pay full price for these players, whatever their dynasty value. */
+const OUT_NOW = { INJURY_RESERVE: 1, OUT: 1, SUSPENSION: 1 };
+let NEWS_REDRAFT = null;
+function outNow(p) {
+  if (!p || p.pos === 'PICK') return false;
+  if (OUT_NOW[p.inj]) return true;
+  if (!NEWS_REDRAFT) { NEWS_REDRAFT = new Map(); const today = new Date().toISOString().slice(0, 10); ((typeof NEWS !== 'undefined' && NEWS && NEWS.items) || []).filter(x => !x.until || x.until >= today).forEach(x => { if (x.espn && typeof x.redraft === 'number') NEWS_REDRAFT.set(String(x.espn), x.redraft); }); }
+  const f = NEWS_REDRAFT.get(String(p.espn));
+  return typeof f === 'number' && f < 0.5;
+}
+const CONTEND_OUT_FACTOR = 0.55;
+/* What a player is worth to a team trying to win this season (dynasty only; redraft values already price injuries in). */
+const contendValue = (m, p) => m.lg.type === 'dynasty' && outNow(p) ? Math.round(p.value * CONTEND_OUT_FACTOR) : p.value;
 function teamMode(m, t) {
   if (m.lg.type !== 'dynasty') return 'contend';
   const set = m.lg.mode;
@@ -353,13 +367,14 @@ function tradeIdeas(m, opts) {
     if (t.id === me.id || (opts.team != null && opts.team !== t.id)) continue;
     if (target && target.owner !== t.id) continue;
     let R = combos(tradeable(t.players.concat(t.picks || [])), 10, triples);
+    const themWin = m.lg.type === 'dynasty' && t.rank.starter <= Math.ceil(m.teams.length / 2);
     if (target) R = R.filter(x => x.c.some(p => p.id === target.id));
     if (opts.need) R = R.filter(x => x.c.some(p => p.pos === opts.need));
     const res = [];
     for (const g of G) for (const r of R) {
       const shape = g.n + 'for' + r.n;
       if (!SHAPES_OK[shape] || (wantShape && wantShape !== shape)) continue;
-      const st = sideTotals(g.vals, r.vals), ga = st.ta, ra = st.tb;
+      const st = sideTotals(themWin ? g.c.map(p => contendValue(m, p)) : g.vals, mode === 'contend' ? r.c.map(p => contendValue(m, p)) : r.vals), ga = st.ta, ra = st.tb;
       if (Math.min(ga, ra) < 400) continue;
       const f = (ra - ga) / Math.max(ga, ra);
       if (f > (mode === 'rebuild' ? 0.1 : 0.06) || f < -0.08) continue;

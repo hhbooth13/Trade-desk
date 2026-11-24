@@ -871,6 +871,20 @@ function combos(arr, maxPair, triples) {
 const SHAPES_OK = { '1for1': 1, '1for2': 1, '2for1': 1, '2for2': 1, '3for1': 1, '1for3': 1 };
 const assetAge = p => p.pos === 'PICK' ? 21.5 : p.age;
 const avgAssetAge = ps => { const a = ps.map(assetAge).filter(Boolean); return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; };
+/* Out right now: on IR, ruled out, suspended, or a news item that wipes out his season (redraft factor under 0.5).
+   Win-now teams won't pay full price for these players, whatever their dynasty value. */
+const OUT_NOW = { INJURY_RESERVE: 1, OUT: 1, SUSPENSION: 1 };
+let NEWS_REDRAFT = null;
+function outNow(p) {
+  if (!p || p.pos === 'PICK') return false;
+  if (OUT_NOW[p.inj]) return true;
+  if (!NEWS_REDRAFT) { NEWS_REDRAFT = new Map(); const today = new Date().toISOString().slice(0, 10); ((typeof NEWS !== 'undefined' && NEWS && NEWS.items) || []).filter(x => !x.until || x.until >= today).forEach(x => { if (x.espn && typeof x.redraft === 'number') NEWS_REDRAFT.set(String(x.espn), x.redraft); }); }
+  const f = NEWS_REDRAFT.get(String(p.espn));
+  return typeof f === 'number' && f < 0.5;
+}
+const CONTEND_OUT_FACTOR = 0.55;
+/* What a player is worth to a team trying to win this season (dynasty only; redraft values already price injuries in). */
+const contendValue = (m, p) => m.lg.type === 'dynasty' && outNow(p) ? Math.round(p.value * CONTEND_OUT_FACTOR) : p.value;
 function teamMode(m, t) {
   if (m.lg.type !== 'dynasty') return 'contend';
   const set = m.lg.mode;
@@ -895,13 +909,14 @@ function tradeIdeas(m, opts) {
     if (t.id === me.id || (opts.team != null && opts.team !== t.id)) continue;
     if (target && target.owner !== t.id) continue;
     let R = combos(tradeable(t.players.concat(t.picks || [])), 10, triples);
+    const themWin = m.lg.type === 'dynasty' && t.rank.starter <= Math.ceil(m.teams.length / 2);
     if (target) R = R.filter(x => x.c.some(p => p.id === target.id));
     if (opts.need) R = R.filter(x => x.c.some(p => p.pos === opts.need));
     const res = [];
     for (const g of G) for (const r of R) {
       const shape = g.n + 'for' + r.n;
       if (!SHAPES_OK[shape] || (wantShape && wantShape !== shape)) continue;
-      const st = sideTotals(g.vals, r.vals), ga = st.ta, ra = st.tb;
+      const st = sideTotals(themWin ? g.c.map(p => contendValue(m, p)) : g.vals, mode === 'contend' ? r.c.map(p => contendValue(m, p)) : r.vals), ga = st.ta, ra = st.tb;
       if (Math.min(ga, ra) < 400) continue;
       const f = (ra - ga) / Math.max(ga, ra);
       if (f > (mode === 'rebuild' ? 0.1 : 0.06) || f < -0.08) continue;
@@ -1557,7 +1572,7 @@ function dynastyOutlook(m) {
     });
     const st = lineup(t.players, m.lg.slots).starters.map(x => x.p).filter(p => p && p.age);
     const age = st.length ? st.reduce((a, p) => a + p.age, 0) / st.length : null;
-    const sellers = t.players.filter(p => SKILL.includes(p.pos) && p.age && PEAK_AGE[p.pos] && p.age >= PEAK_AGE[p.pos] + (p.pos === 'RB' ? 1 : 2) && p.value >= 1500).sort((a, b) => b.value - a.value).slice(0, 3);
+    const sellers = t.players.filter(p => !outNow(p) && SKILL.includes(p.pos) && p.age && PEAK_AGE[p.pos] && p.age >= PEAK_AGE[p.pos] + (p.pos === 'RB' ? 1 : 2) && p.value >= 1500).sort((a, b) => b.value - a.value).slice(0, 3);
     const young = t.players.filter(p => SKILL.includes(p.pos) && p.age && p.age <= 24 && p.value >= 1500).sort((a, b) => b.value - a.value).slice(0, 3);
     return { team: t, scores, age, picks: (t.picks || []).filter(p => p.round === 1).length, sellers, young };
   });
@@ -1606,7 +1621,7 @@ function gamePlan(m, o, teamId) {
     buy.sort((a, b) => b.p.value - a.p.value); buy = buy.slice(0, 5);
   } else {
     const needs = t.needs.length ? t.needs : SKILL.filter(p => t.rank[p] > third);
-    others.filter(isSeller).forEach(x => x.team.players.filter(p => needs.includes(p.pos) && p.value >= 1500 && (!p.age || p.age >= 25)).forEach(p => buy.push({ p, from: x.team })));
+    others.filter(isSeller).forEach(x => x.team.players.filter(p => needs.includes(p.pos) && p.value >= 1500 && (!p.age || p.age >= 25) && !outNow(p)).forEach(p => buy.push({ p, from: x.team })));
     buy.sort((a, b) => b.p.value - a.p.value); buy = buy.slice(0, 5);
   }
   const picks = (t.picks || []).slice().sort((a, b) => a.year - b.year || a.round - b.round);
@@ -1614,11 +1629,13 @@ function gamePlan(m, o, teamId) {
     : dir === 'contend' ? (picks.length ? 'Your picks are trade chips. Later-year picks cost you the least today.' : 'You\u2019re out of picks to deal; use young bench players instead.')
     : 'Hold your firsts unless they bring back a clear upgrade.';
   const steps = [];
-  if (sell.length) steps.push(dir === 'rebuild' ? 'Sell ' + sell.slice(0, 2).map(p => p.name).join(' and ') + ' before age drops their value.' : 'Package ' + sell.slice(0, 2).map(p => p.name).join(' and ') + ' (bench depth) for one better starter.');
+  const healthy = sell.filter(p => !outNow(p)), hurt = sell.filter(p => outNow(p));
+  if (healthy.length) steps.push(dir === 'rebuild' ? 'Sell ' + healthy.slice(0, 2).map(p => p.name).join(' and ') + ' before age drops their value.' : 'Package ' + healthy.slice(0, 2).map(p => p.name).join(' and ') + ' (bench depth) for one better starter.');
+  if (hurt.length && dir === 'rebuild') steps.push('Hold ' + hurt.map(p => p.name).join(' and ') + ' until ' + (hurt.length > 1 ? 'they\u2019re' : 'he\u2019s') + ' healthy; win-now teams won\u2019t pay for an injured player.');
   if (buy.length) steps.push(dir === 'rebuild' ? 'Target young players like ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team trying to win now.' : 'Target ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team looking to the future.');
   if (t.needs.length && dir !== 'rebuild') steps.push('Your weakest spot' + (t.needs.length > 1 ? 's are ' : ' is ') + t.needs.join(' and ') + '. Upgrade there first.');
   steps.push(pickAdvice);
-  return { r, dir, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p) })), buy, picks };
+  return { r, dir, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p), out: outNow(p) })), buy, picks };
 }
 
 /* ---------- 2027 rookie board (1QB dynasty), as of Nov 23, 2026 ----------
@@ -2434,7 +2451,7 @@ function openPlan(teamId) {
   const mine = g.r.team.id === m.lg.myTeamId, t = g.r.team;
   const tag = l => '<span class="otag" style="--h:' + OUTLOOK_HUE[l] + '">' + l + '</span>';
   const chip = (p, extra) => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + (p.age ? ' <span class="muted">' + p.age.toFixed(0) + '</span>' : '') + ' <b>' + fmt(p.value) + '</b>' + (extra || '') + '</span>';
-  const sellRows = g.sell.map(x => '<div class="plan-row">' + chip(x.p, x.loss >= 0.15 ? ' <span class="neg-d small">−' + Math.round(x.loss * 100) + '% by ' + o.windows[2].year + '</span>' : '') + (x.buyers.length ? '<span class="small muted">Buyers: ' + x.buyers.map(b => esc(b.abbrev || b.name)).join(', ') + '</span>' : '') + '</div>').join('');
+  const sellRows = g.sell.map(x => '<div class="plan-row">' + chip(x.p, x.loss >= 0.15 ? ' <span class="neg-d small">−' + Math.round(x.loss * 100) + '% by ' + o.windows[2].year + '</span>' : '') + (x.out ? '<span class="small" style="color:var(--mid)">Out right now: win-now teams won\u2019t pay full price. Sell once he\u2019s healthy, or to a rebuilding team.</span>' : x.buyers.length ? '<span class="small muted">Buyers: ' + x.buyers.map(b => esc(b.abbrev || b.name)).join(', ') + '</span>' : '') + '</div>').join('');
   const buyRows = g.buy.map(x => '<div class="plan-row">' + chip(x.p) + '<span class="small muted own-t">from ' + fteamAvatar(x.from, 'xs') + esc(x.from.abbrev || x.from.name) + '</span></div>').join('');
   const d = $('#modal');
   d.innerHTML = '<div class="modal-card sheet wide" role="dialog" aria-modal="true" aria-labelledby="gph"><div class="sheet-head">' + fteamAvatar(t, 'lg') + '<div><div class="small muted">' + (mine ? 'Your game plan' : 'Their likely game plan') + '</div><h3 id="gph" class="plan-h">' + esc(g.head) + '</h3><div>' + tag(g.r.label) + ' <span class="small muted">' + o.windows.map((w, i) => w.label + ' ' + ord(g.r.ranks[i])).join(' · ') + '</span></div></div><button class="x sheet-x" id="pClose" aria-label="Close">×</button></div>' +
