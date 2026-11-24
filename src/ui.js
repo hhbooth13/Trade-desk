@@ -98,6 +98,7 @@ function modelFor(lg) {
   if (!lg) return null;
   const vs = getVS(lg);
   const key = [lg.id, lg.mode || '', JSON.stringify(lg.valueOverrides || {}), lg.type, lg.syncedAt, vs.src.asOf, vs.src.txt.length, lg.myTeamId, lg.pickRounds || 3, JSON.stringify(lg.pickOwners || {}), JSON.stringify(lg.manualTrades || [])].join('|');
+  WAIVER_DYNASTY = lg.type === 'dynasty';
   let c = modelCache.get(lg.id);
   if (!c || c.key !== key) { c = { key, m: buildModel(lg, vs) }; modelCache.set(lg.id, c); }
   return c.m;
@@ -340,7 +341,8 @@ function viewCalc(m) {
     return '<section class="card side"><div class="side-head"><h3>' + label + '</h3>' + teamSelect(key === 'a' ? 'aTeam' : 'bTeam', team ? team.id : null, 'Any team') + '</div>' +
       '<div class="assets">' + (list.map(p => '<div class="asset">' + playerLine(p, { dyn: m.lg.type === 'dynasty' }) + '<span class="num">' + fmt(p.value) + '</span><button class="x" data-act="rm" data-side="' + key + '" data-id="' + esc(p.id) + '" aria-label="Remove ' + esc(p.name) + '">×</button></div>').join('') || '<p class="muted small empty">Add players' + (m.lg.type === 'dynasty' ? ' or picks' : '') + ' below.</p>') + '</div>' +
       '<div class="search"><input id="q-' + key + '" type="search" autocomplete="off" placeholder="Add a player' + (m.lg.type === 'dynasty' ? ' or pick' : '') + '…" data-side="' + key + '" value="' + (ui.search.side === key ? esc(ui.search.q) : '') + '"><div class="results" id="r-' + key + '"></div></div>' +
-      '<div class="side-total"><span>Raw total ' + fmt(total) + '</span><b>Trade value ' + fmt(key === 'a' ? f.ta : f.tb) + '</b></div></section>';
+      ((key === 'a' ? f.adjA : f.adjB) > 0 ? '<div class="waiver-adj"><span>Waiver adjustment</span><b>+' + fmt(key === 'a' ? f.adjA : f.adjB) + '</b></div>' : '') +
+      '<div class="side-total"><span>Players ' + fmt(total) + '</span><b>Trade value ' + fmt(key === 'a' ? f.ta : f.tb) + '</b></div></section>';
   };
   let verdict = '', extra = '';
   if (A.length && B.length) {
@@ -351,7 +353,7 @@ function viewCalc(m) {
     const share = f.ta + f.tb ? Math.round(f.ta / (f.ta + f.tb) * 100) : 50;
     verdict = '<section class="card verdict ' + cls + '"><div class="v-head">' + head + '<small>' + (Math.abs(pct) < 5 ? 'within 5% either way' : Math.abs(pct) + '% gap in trade value') + '</small></div>' +
       '<div class="split"><div class="split-a" style="width:' + share + '%"><span>' + fmt(f.ta) + '</span></div><div class="split-b"><span>' + fmt(f.tb) + '</span></div></div>' +
-      '<p class="muted small">Trade value counts a package as worth less than the sum of its players, because the side getting the single best player also frees a roster spot.</p>';
+      (f.adjA || f.adjB ? '<p class="muted small">Waiver adjustment: the side getting more players has to drop someone to make room, so the side getting fewer is credited with that roster spot, like FantasyCalc does.</p>' : '');
     if (Math.abs(f.pct) >= 0.05) {
       const aShort = f.ta < f.tb;
       const shortSide = aShort ? 'a' : 'b', shortList = aShort ? A : B, longList = aShort ? B : A, shortTeam = aShort ? tA : tB;
@@ -369,7 +371,7 @@ function viewCalc(m) {
     verdict += '<div class="v-actions"><button class="btn ghost" data-act="swapSides">Swap sides</button><button class="btn ghost" data-act="clearCalc">Clear</button></div></section>';
   } else if (B.length && tA) {
     const target = f.tb, ex = new Set(c.b);
-    const pk = findPackages(tA.players.concat(tA.picks), target, m.lg.slots, tA.starterValue, ex);
+    const pk = findPackages(tA.players.concat(tA.picks), B.map(p => p.value), m.lg.slots, tA.starterValue, ex);
     extra = '<section class="card verdict"><div class="v-head">Offers from ' + teamName(tA) + '<small>packages worth about ' + fmt(target) + ' that cost your lineup the least</small></div>' +
       (pk.map((x, i) => '<button class="offer" data-act="usePkg" data-i="' + i + '"><span>' + x.give.map(p => esc(p.name)).join(' + ') + '</span><span class="num">' + fmt(x.v) + '</span><span class="muted small">starters ' + sgn(-x.loss) + '</span></button>').join('') || '<p class="muted">No package on this roster matches that value.</p>') + '</section>';
     ui._pkgs = pk;

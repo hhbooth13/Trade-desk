@@ -108,6 +108,9 @@ textarea { width: 100%; font-family: var(--mono); font-size: 12px; resize: verti
 .subtabs a { flex: 1; text-align: center; padding: 7px 10px; border-radius: 7px; color: var(--muted); text-decoration: none; font: 700 13px var(--display); }
 .subtabs a.on { background: var(--surface2); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .subtabs a:hover { color: var(--ink); }
+.waiver-adj { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding: 6px 10px; border: 1px dashed var(--line); border-radius: 8px; font-size: 12px; color: var(--muted); }
+.waiver-adj b { color: var(--good, #3ccf7a); }
+.gchip.wa { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
 .tf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
 @media (max-width: 560px) { .tf-grid { grid-template-columns: 1fr; } }
 .tf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; min-height: 26px; }
@@ -561,6 +564,7 @@ function rankTeams(teams) {
 }
 
 function buildModel(lg, vs) {
+  WAIVER_DYNASTY = lg.type === 'dynasty';
   const teams = lg.teams.map(t => Object.assign({}, t, { players: t.roster.map(r => mkPlayer(r, vs, t.id)), picks: [] }));
   const everyone = [].concat(...teams.map(t => t.players));
   estimateValues(everyone, vs, lg.type === 'dynasty' ? 'dynasty' : 'redraft', everyone);
@@ -644,10 +648,32 @@ function tv(vals) {
   return Math.round(Math.pow(s, 1 / TRADE_EXP));
 }
 
-function fairness(a, b) {
-  const ta = tv(a.map(p => p.value)), tb = tv(b.map(p => p.value));
-  const max = Math.max(ta, tb, 1);
-  return { ta, tb, diff: tb - ta, pct: (tb - ta) / max };
+/* FantasyCalc's waiver adjustment. When one side gets fewer players, the other side has to cut someone
+   to make room, so the side getting fewer players is credited with roster-spot value, based on the
+   cheapest extra players on the bigger side:
+   Dynasty: min(value x 0.6982, 753 + i x 0.23) per extra player, floored.
+   Redraft: min(round(value x 0.42), 550) per extra player, plus 200 for each extra player beyond the first. */
+let WAIVER_DYNASTY = true;
+const WAIVER = { dynasty: { pct: 0.6982, cap: 753, step: 0.23 }, redraft: { pct: 0.42, cap: 550, extra: 200 } };
+function waiverAdj(shortVals, longVals, dyn) {
+  const k = longVals.length - shortVals.length;
+  if (k <= 0 || !shortVals.length || !longVals.length) return 0;
+  const cheapest = longVals.slice().sort((x, y) => x - y).slice(0, k);
+  if (dyn) { const w = WAIVER.dynasty; return cheapest.reduce((s, v, i) => s + Math.floor(Math.min(v * w.pct, w.cap + i * w.step)), 0); }
+  const w = WAIVER.redraft;
+  return cheapest.reduce((s, v) => s + Math.min(Math.round(v * w.pct), w.cap), 0) + Math.max(0, (k - 1) * w.extra);
+}
+/* Each side's trade value: the plain sum of its assets, plus the waiver adjustment for the side getting fewer pieces. */
+function sideTotals(aVals, bVals, dyn) {
+  if (dyn == null) dyn = WAIVER_DYNASTY;
+  const rawA = aVals.reduce((s, v) => s + (+v || 0), 0), rawB = bVals.reduce((s, v) => s + (+v || 0), 0);
+  const adjA = waiverAdj(aVals, bVals, dyn), adjB = waiverAdj(bVals, aVals, dyn);
+  return { rawA, rawB, adjA, adjB, ta: rawA + adjA, tb: rawB + adjB };
+}
+function fairness(a, b, dyn) {
+  const s = sideTotals(a.map(p => p.value), b.map(p => p.value), dyn);
+  const max = Math.max(s.ta, s.tb, 1);
+  return Object.assign(s, { diff: s.tb - s.ta, pct: (s.tb - s.ta) / max });
 }
 
 function swapPlayers(players, out, inc) {
@@ -666,7 +692,7 @@ function combos(arr, maxPair, triples) {
     const t3 = arr.filter(p => p.pos !== 'PICK').slice(0, 7).concat(arr.filter(p => p.pos === 'PICK').slice(0, 2));
     for (let i = 0; i < t3.length; i++) for (let j = i + 1; j < t3.length; j++) for (let k = j + 1; k < t3.length; k++) out.push([t3[i], t3[j], t3[k]]);
   }
-  return out.map(c => ({ c, v: tv(c.map(p => p.value)), n: c.length }));
+  return out.map(c => ({ c, vals: c.map(p => p.value), v: c.reduce((s, p) => s + p.value, 0), n: c.length }));
 }
 const SHAPES_OK = { '1for1': 1, '1for2': 1, '2for1': 1, '2for2': 1, '3for1': 1, '1for3': 1 };
 const assetAge = p => p.pos === 'PICK' ? 21.5 : p.age;
@@ -701,7 +727,7 @@ function tradeIdeas(m, opts) {
     for (const g of G) for (const r of R) {
       const shape = g.n + 'for' + r.n;
       if (!SHAPES_OK[shape] || (wantShape && wantShape !== shape)) continue;
-      const ga = g.v, ra = r.v;
+      const st = sideTotals(g.vals, r.vals), ga = st.ta, ra = st.tb;
       if (Math.min(ga, ra) < 400) continue;
       const f = (ra - ga) / Math.max(ga, ra);
       if (f > (mode === 'rebuild' ? 0.1 : 0.06) || f < -0.08) continue;
@@ -775,10 +801,11 @@ function ideaReasons(x, me, n) {
 }
 
 /* Packages from a roster that match a target trade value (for "find me an offer"). */
-function findPackages(players, target, slots, baseLineup, exclude) {
+function findPackages(players, targetVals, slots, baseLineup, exclude) {
   const pool = tradeable(players).filter(p => !exclude.has(p.id));
   const out = [];
-  for (const { c, v } of combos(pool, 12, true)) {
+  for (const { c, vals } of combos(pool, 12, true)) {
+    const st = sideTotals(vals, targetVals), v = st.ta, target = st.tb;
     const f = (v - target) / Math.max(v, target);
     if (f < -0.05 || f > 0.12) continue;
     const loss = baseLineup - lineup(swapPlayers(players, c, []), slots).value;
@@ -789,9 +816,9 @@ function findPackages(players, target, slots, baseLineup, exclude) {
 
 /* Assets that bring a lopsided trade back to even, added to the short side. */
 function balancers(sideShort, sideLong, pool, exclude) {
-  const vals = sideShort.map(p => p.value), target = tv(sideLong.map(p => p.value));
+  const vals = sideShort.map(p => p.value), longVals = sideLong.map(p => p.value);
   return pool.filter(p => !exclude.has(p.id) && p.value > 0).map(p => {
-    const nv = tv(vals.concat(p.value));
+    const st = sideTotals(vals.concat(p.value), longVals), nv = st.ta, target = st.tb;
     return { p, nv, gap: Math.abs(target - nv) / Math.max(target, nv) };
   }).sort((a, b) => a.gap - b.gap).slice(0, 3).filter(x => x.gap < 0.15);
 }
@@ -1119,7 +1146,8 @@ function tradeGrades(m) {
     const sides = {};
     x.items.forEach(([pid, from, to]) => { (sides[to] = sides[to] || { got: [] }).got.push(assetNow(m, pid)); sides[from] = sides[from] || { got: [] }; });
     const ids = Object.keys(sides).map(Number);
-    const rows = ids.map(id => ({ team: m.byId.get(id), got: sides[id].got, v: tv(sides[id].got.map(p => p.value)) }));
+    const rows = ids.map(id => ({ team: m.byId.get(id), got: sides[id].got, v: sides[id].got.reduce((s, p) => s + p.value, 0), adj: 0 }));
+    if (rows.length === 2) { const st = sideTotals(rows[0].got.map(p => p.value), rows[1].got.map(p => p.value), m.lg.type === 'dynasty'); rows[0].adj = st.adjA; rows[1].adj = st.adjB; rows[0].v = st.ta; rows[1].v = st.tb; }
     rows.sort((a, b) => b.v - a.v);
     const top = rows[0], second = rows[1] || { v: 0 };
     const margin = top.v ? (top.v - second.v) / top.v : 0;
@@ -1631,7 +1659,7 @@ function gradesCard(m) {
   return '<section class="card mt">' + head + '<p class="muted small">Every trade this season, judged by what each side’s haul is worth today. Missing one? Add it above.</p>' +
     gs.map(g => '<div class="grade"><div class="grade-top"><span class="fair ' + (g.grade === 'Even' ? 'good' : 'mid') + '">' + (g.grade === 'Even' ? 'Even trade' : (g.grade === 'Win' ? 'Clear win: ' : 'Slight edge: ') + esc(g.winner ? g.winner.name : '')) + '</span>' +
       '<span class="small muted">' + (g.pending ? '<span class="estb">in review</span> ' : '') + (g.manual ? 'added by you · ' : '') + (g.d ? when(g.d) : '') + (g.manual ? ' <button class="link small" data-act="tradeDel" data-id="' + esc(g.manual) + '">Remove</button>' : '') + '</span></div>' +
-      g.rows.map(r => '<div class="grade-side"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b><span class="muted small">got</span></div><div class="grade-got">' + r.got.map(p => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + ' <b>' + fmt(p.value) + '</b></span>').join('') + '</div><div class="num">' + fmt(r.v) + '</div></div>').join('') + '</div>').join('') + '</section>';
+      g.rows.map(r => '<div class="grade-side"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b><span class="muted small">got</span></div><div class="grade-got">' + r.got.map(p => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + ' <b>' + fmt(p.value) + '</b></span>').join('') + (r.adj ? '<span class="gchip wa">Waiver adj. <b>+' + fmt(r.adj) + '</b></span>' : '') + '</div><div class="num">' + fmt(r.v) + '</div></div>').join('') + '</div>').join('') + '</section>';
 }
 
 /* ---------- Add a trade by hand (for trades the ESPN sync misses, or pick trades) ---------- */
@@ -2020,6 +2048,7 @@ function modelFor(lg) {
   if (!lg) return null;
   const vs = getVS(lg);
   const key = [lg.id, lg.mode || '', JSON.stringify(lg.valueOverrides || {}), lg.type, lg.syncedAt, vs.src.asOf, vs.src.txt.length, lg.myTeamId, lg.pickRounds || 3, JSON.stringify(lg.pickOwners || {}), JSON.stringify(lg.manualTrades || [])].join('|');
+  WAIVER_DYNASTY = lg.type === 'dynasty';
   let c = modelCache.get(lg.id);
   if (!c || c.key !== key) { c = { key, m: buildModel(lg, vs) }; modelCache.set(lg.id, c); }
   return c.m;
@@ -2262,7 +2291,8 @@ function viewCalc(m) {
     return '<section class="card side"><div class="side-head"><h3>' + label + '</h3>' + teamSelect(key === 'a' ? 'aTeam' : 'bTeam', team ? team.id : null, 'Any team') + '</div>' +
       '<div class="assets">' + (list.map(p => '<div class="asset">' + playerLine(p, { dyn: m.lg.type === 'dynasty' }) + '<span class="num">' + fmt(p.value) + '</span><button class="x" data-act="rm" data-side="' + key + '" data-id="' + esc(p.id) + '" aria-label="Remove ' + esc(p.name) + '">×</button></div>').join('') || '<p class="muted small empty">Add players' + (m.lg.type === 'dynasty' ? ' or picks' : '') + ' below.</p>') + '</div>' +
       '<div class="search"><input id="q-' + key + '" type="search" autocomplete="off" placeholder="Add a player' + (m.lg.type === 'dynasty' ? ' or pick' : '') + '…" data-side="' + key + '" value="' + (ui.search.side === key ? esc(ui.search.q) : '') + '"><div class="results" id="r-' + key + '"></div></div>' +
-      '<div class="side-total"><span>Raw total ' + fmt(total) + '</span><b>Trade value ' + fmt(key === 'a' ? f.ta : f.tb) + '</b></div></section>';
+      ((key === 'a' ? f.adjA : f.adjB) > 0 ? '<div class="waiver-adj"><span>Waiver adjustment</span><b>+' + fmt(key === 'a' ? f.adjA : f.adjB) + '</b></div>' : '') +
+      '<div class="side-total"><span>Players ' + fmt(total) + '</span><b>Trade value ' + fmt(key === 'a' ? f.ta : f.tb) + '</b></div></section>';
   };
   let verdict = '', extra = '';
   if (A.length && B.length) {
@@ -2273,7 +2303,7 @@ function viewCalc(m) {
     const share = f.ta + f.tb ? Math.round(f.ta / (f.ta + f.tb) * 100) : 50;
     verdict = '<section class="card verdict ' + cls + '"><div class="v-head">' + head + '<small>' + (Math.abs(pct) < 5 ? 'within 5% either way' : Math.abs(pct) + '% gap in trade value') + '</small></div>' +
       '<div class="split"><div class="split-a" style="width:' + share + '%"><span>' + fmt(f.ta) + '</span></div><div class="split-b"><span>' + fmt(f.tb) + '</span></div></div>' +
-      '<p class="muted small">Trade value counts a package as worth less than the sum of its players, because the side getting the single best player also frees a roster spot.</p>';
+      (f.adjA || f.adjB ? '<p class="muted small">Waiver adjustment: the side getting more players has to drop someone to make room, so the side getting fewer is credited with that roster spot, like FantasyCalc does.</p>' : '');
     if (Math.abs(f.pct) >= 0.05) {
       const aShort = f.ta < f.tb;
       const shortSide = aShort ? 'a' : 'b', shortList = aShort ? A : B, longList = aShort ? B : A, shortTeam = aShort ? tA : tB;
@@ -2291,7 +2321,7 @@ function viewCalc(m) {
     verdict += '<div class="v-actions"><button class="btn ghost" data-act="swapSides">Swap sides</button><button class="btn ghost" data-act="clearCalc">Clear</button></div></section>';
   } else if (B.length && tA) {
     const target = f.tb, ex = new Set(c.b);
-    const pk = findPackages(tA.players.concat(tA.picks), target, m.lg.slots, tA.starterValue, ex);
+    const pk = findPackages(tA.players.concat(tA.picks), B.map(p => p.value), m.lg.slots, tA.starterValue, ex);
     extra = '<section class="card verdict"><div class="v-head">Offers from ' + teamName(tA) + '<small>packages worth about ' + fmt(target) + ' that cost your lineup the least</small></div>' +
       (pk.map((x, i) => '<button class="offer" data-act="usePkg" data-i="' + i + '"><span>' + x.give.map(p => esc(p.name)).join(' + ') + '</span><span class="num">' + fmt(x.v) + '</span><span class="muted small">starters ' + sgn(-x.loss) + '</span></button>').join('') || '<p class="muted">No package on this roster matches that value.</p>') + '</section>';
     ui._pkgs = pk;

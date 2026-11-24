@@ -65,7 +65,8 @@ function tradeGrades(m) {
     const sides = {};
     x.items.forEach(([pid, from, to]) => { (sides[to] = sides[to] || { got: [] }).got.push(assetNow(m, pid)); sides[from] = sides[from] || { got: [] }; });
     const ids = Object.keys(sides).map(Number);
-    const rows = ids.map(id => ({ team: m.byId.get(id), got: sides[id].got, v: tv(sides[id].got.map(p => p.value)) }));
+    const rows = ids.map(id => ({ team: m.byId.get(id), got: sides[id].got, v: sides[id].got.reduce((s, p) => s + p.value, 0), adj: 0 }));
+    if (rows.length === 2) { const st = sideTotals(rows[0].got.map(p => p.value), rows[1].got.map(p => p.value), m.lg.type === 'dynasty'); rows[0].adj = st.adjA; rows[1].adj = st.adjB; rows[0].v = st.ta; rows[1].v = st.tb; }
     rows.sort((a, b) => b.v - a.v);
     const top = rows[0], second = rows[1] || { v: 0 };
     const margin = top.v ? (top.v - second.v) / top.v : 0;
