@@ -28,6 +28,25 @@
     },
     {
       "league": "dynasty",
+      "date": "2026-10-09",
+      "sides": [
+        {
+          "team": "Gay QB Throws TD to Jerimiah",
+          "got": [
+            "Kaelon Black",
+            "Devaughn Vele"
+          ]
+        },
+        {
+          "team": "Freeeeda",
+          "got": [
+            "RJ Harvey"
+          ]
+        }
+      ]
+    },
+    {
+      "league": "dynasty",
       "date": "2026-11-12",
       "sides": [
         {
