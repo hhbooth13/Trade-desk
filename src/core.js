@@ -176,8 +176,12 @@ function rankTeams(teams) {
 
 /* Short label for each team: the manager's first name (team names and ESPN abbreviations change too often).
    Shared first names get a last initial. Falls back to the ESPN abbreviation when there's no manager name. */
+/* Manager names misspelled on ESPN, fixed for display. */
+const OWNER_FIX = { Tylet: 'Tyler' };
+const fixOwner = s => String(s || '').replace(/\b[A-Za-z]+\b/g, w => OWNER_FIX[w] || OWNER_FIX[w[0].toUpperCase() + w.slice(1).toLowerCase()] || w);
 function ownerLabels(teams, lg) {
   if (lg.demo) return;
+  teams.forEach(t => { if (t.owner) t.owner = fixOwner(t.owner); });
   const first = t => { const o = String(t.owner || '').split(',')[0].trim(); return o && o !== 'You' ? o : ''; };
   const fn = t => first(t).split(/\s+/)[0] || '';
   const count = {}; teams.forEach(t => { const f = fn(t).toLowerCase(); if (f) count[f] = (count[f] || 0) + 1; });
