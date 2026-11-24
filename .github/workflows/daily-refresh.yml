@@ -3,6 +3,7 @@ name: Daily data refresh
 on:
   schedule:
     - cron: '17 10 * * *'   # 5:17 AM Eastern (6:17 AM during daylight time)
+    - cron: '43 18 * * *'   # 1:43 PM Eastern (2:43 PM during daylight time)
   workflow_dispatch:
 
 permissions:
