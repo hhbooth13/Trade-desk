@@ -360,7 +360,9 @@ function tradeIdeas(m, opts) {
   const shop = opts.shop ? m.players.get(opts.shop) : null;
   const wantShape = opts.shape || '';
   const triples = !wantShape || wantShape === '3for1' || wantShape === '1for3' || !!target || !!shop;
-  let G = combos(tradeable(me.players.concat(me.picks || [])), 10, triples);
+  /* Hold injured players (their value climbs as they heal and contenders won't pay now), unless you're shopping them or put them on your block. */
+  const onBlock = new Set(((m.lg.block || {}).sell) || []);
+  let G = combos(tradeable(me.players.map(p => p.slot === 21 && (onBlock.has(p.id) || opts.shop === p.id) ? Object.assign({}, p, { slot: 20 }) : p).concat(me.picks || [])).filter(p => !outNow(p) || onBlock.has(p.id) || (opts.shop && opts.shop === p.id)), 10, triples);
   if (shop) G = G.filter(x => x.c.some(p => p.id === shop.id));
   const all = [];
   for (const t of m.teams) {

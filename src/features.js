@@ -359,11 +359,14 @@ function gamePlan(m, o, teamId) {
     : dir === 'contend' ? (picks.length ? 'Your picks are trade chips. Later-year picks cost you the least today.' : 'You\u2019re out of picks to deal; use young bench players instead.')
     : 'Hold your firsts unless they bring back a clear upgrade.';
   const steps = [];
-  const healthy = sell.filter(p => !outNow(p)), hurt = sell.filter(p => outNow(p));
+  const hold = t.players.filter(p => SKILL.includes(p.pos) && outNow(p) && p.value >= 800).sort((a, b) => b.value - a.value);
+  sell = sell.filter(p => !outNow(p));
+  const healthy = sell, hurt = [];
   if (healthy.length) steps.push(dir === 'rebuild' ? 'Sell ' + healthy.slice(0, 2).map(p => p.name).join(' and ') + ' before age drops their value.' : 'Package ' + healthy.slice(0, 2).map(p => p.name).join(' and ') + ' (bench depth) for one better starter.');
   if (hurt.length && dir === 'rebuild') steps.push('Hold ' + hurt.map(p => p.name).join(' and ') + ' until ' + (hurt.length > 1 ? 'they\u2019re' : 'he\u2019s') + ' healthy; win-now teams won\u2019t pay for an injured player.');
   if (buy.length) steps.push(dir === 'rebuild' ? 'Target young players like ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team trying to win now.' : 'Target ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team looking to the future.');
   if (t.needs.length && dir !== 'rebuild') steps.push('Your weakest spot' + (t.needs.length > 1 ? 's are ' : ' is ') + t.needs.join(' and ') + '. Upgrade there first.');
   steps.push(pickAdvice);
-  return { r, dir, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p), out: outNow(p) })), buy, picks };
+  if (hold.length) steps.push('Hold ' + hold.slice(0, 2).map(p => p.name).join(' and ') + '. ' + (hold.length > 1 ? 'Their' : 'His') + ' value should climb as ' + (hold.length > 1 ? 'they get' : 'he gets') + ' healthy, and contenders won\u2019t pay for an injured player now.');
+  return { r, dir, hold, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p), out: outNow(p) })), buy, picks };
 }
