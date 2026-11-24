@@ -318,13 +318,12 @@ async function loadLive(p) {
       /* Standard PPR: 1 per catch, 0.1 per rush/rec yard, 0.04 per pass yard, 6 per rush/rec TD, 4 per pass TD, -2 per INT or lost fumble. */
       const num = v => { const x = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(x) ? x : 0; };
       const ppr = row => { const g = k => num(pick(row, k)); return g('passingYards') * 0.04 + g('passingTouchdowns') * 4 - g('interceptions') * 2 + g('rushingYards') * 0.1 + g('rushingTouchdowns') * 6 + g('receptions') + g('receivingYards') * 0.1 + g('receivingTouchdowns') * 6 - g('fumblesLost') * 2; };
-      /* Kickers (ESPN standard): FG 0-39 = 3, 40-49 = 4, 50+ = 5, XP = 1, each missed FG or XP = -1. */
+      /* Kickers: distance-based field goals, 0.1 per yard (a 35-yarder is 3.5), extra points 1, each missed FG or XP -1.
+         ESPN's game log gives the average distance of made field goals, so made x average / 10 is the field goal total. */
       const split = (row, k) => { const v = String(pick(row, k) || '0-0').split('-'); return [num(v[0]), num(v[1])]; };
       const kpts = row => {
-        let pts = 0;
-        [['fieldGoalsMade1_19-fieldGoalAttempts1_19', 3], ['fieldGoalsMade20_29-fieldGoalAttempts20_29', 3], ['fieldGoalsMade30_39-fieldGoalAttempts30_39', 3], ['fieldGoalsMade40_49-fieldGoalAttempts40_49', 4], ['fieldGoalsMade50-fieldGoalAttempts50', 5]].forEach(([k, v]) => { const [m, a] = split(row, k); pts += m * v - (a - m); });
-        const [xm, xa] = split(row, 'extraPointsMade-extraPointAttempts'); pts += xm - (xa - xm);
-        return pts;
+        const [fm, fa] = split(row, 'fieldGoalsMade-fieldGoalAttempts'), [xm, xa] = split(row, 'extraPointsMade-extraPointAttempts');
+        return fm * num(pick(row, 'fieldGoalsMadeYardsAverage')) / 10 - (fa - fm) + xm - (xa - xm);
       };
       const isK = p.pos === 'K' || names.includes('extraPointsMade-extraPointAttempts');
       const fpts = row => isK ? kpts(row) : ppr(row);
