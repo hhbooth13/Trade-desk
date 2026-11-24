@@ -43,6 +43,10 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .ltab small { font-weight: 600; font-size: 10px; color: #8d939c; text-transform: uppercase; letter-spacing: .06em; }
 .ltab.on { background: #fff; color: #000; border-color: #fff; }
 .ltab.on small { color: #555; }
+.syncb { gap: 6px; align-items: center; }
+.syncb .spin { display: inline-block; font-size: 15px; line-height: 1; }
+.syncb.busy .spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .ltab.add { border-style: dashed; color: #b8bec6; background: transparent; }
 .tabs { background: var(--chrome); display: flex; gap: 2px; padding: 0 20px; overflow-x: auto; border-bottom: 1px solid #2b3039; }
 .tabs a { color: #aeb5bf; text-decoration: none; padding: 11px 13px; font: 700 13px var(--display); border-bottom: 3px solid transparent; white-space: nowrap; display: flex; gap: 8px; align-items: center; }

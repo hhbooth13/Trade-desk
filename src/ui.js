@@ -202,12 +202,21 @@ function playerLine(p, opts) {
 const teamName = t => esc(t ? t.name : '');
 
 /* ----- header ----- */
+function ago(t) {
+  const m = Math.round((Date.now() - t) / 60000);
+  return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago';
+}
+function syncButton() {
+  const real = S.order.filter(id => !S.leagues[id].demo);
+  const oldest = Math.min(...real.map(id => S.leagues[id].syncedAt || 0));
+  return '<button class="ltab syncb' + (syncing ? ' busy' : '') + '" data-act="pwaSyncAll" aria-label="Sync all leagues now"><span class="spin" aria-hidden="true">⟳</span>' + (syncing ? 'Syncing…' : 'Synced ' + ago(oldest)) + '</button>';
+}
 function renderHeader() {
   const lg = S.leagues[S.active];
   $('#leagueTabs').innerHTML = S.order.map(id => {
     const l = S.leagues[id];
     return '<button class="ltab' + (id === S.active ? ' on' : '') + '" data-act="league" data-id="' + esc(id) + '">' + esc(l.name) + '<small>' + (l.demo ? 'demo' : l.type) + '</small></button>';
-  }).join('') + '<a class="ltab add" href="#sync">+ Sync league</a>';
+  }).join('') + (PWA && S.order.some(id => !S.leagues[id].demo) ? syncButton() : '') + '<a class="ltab add" href="#sync">' + (PWA && S.order.some(id => !S.leagues[id].demo) ? '+ League' : '+ Sync league') + '</a>';
   if (lg) {
     const src = valueSource(lg);
     $('#valuesNote').innerHTML = 'FantasyCalc ' + esc(src.type) + ' values · ' + esc(src.desc) + ' · ' + when(src.asOf) +
@@ -781,6 +790,7 @@ let syncing = false;
 async function runSync(ids, quiet) {
   if (syncing || !ids.length) return;
   syncing = true;
+  try { renderHeader(); } catch (e) {}
   const say = (t, cls) => { const el = $('#syncMsg'); if (el) { el.className = 'small mt ' + (cls || ''); el.textContent = t; } if (quiet || !el) { const b = $('#banner'); if (b) b.innerHTML = t ? '<div class="banner">' + esc(t) + '</div>' : ''; } };
   const done = [];
   try {
@@ -809,7 +819,17 @@ function confirmBox(text, onYes) {
 
 window.addEventListener('hashchange', route);
 loadLocal();
-if (PWA) setTimeout(() => { const stale = S.order.filter(id => !S.leagues[id].demo && Date.now() - (S.leagues[id].syncedAt || 0) > 6 * 3600e3); if (stale.length) runSync(stale, true); }, 600);
+/* Keep leagues fresh: sync on open and whenever the app comes back to the screen, if data is over 30 minutes old. */
+function autoSync() {
+  if (!PWA || syncing) return;
+  const stale = S.order.filter(id => !S.leagues[id].demo && Date.now() - (S.leagues[id].syncedAt || 0) > 30 * 60e3);
+  if (stale.length) runSync(stale, true);
+}
+if (PWA) {
+  setTimeout(autoSync, 600);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoSync(); else return; renderHeader(); });
+  setInterval(() => { if (document.visibilityState === 'visible') renderHeader(); }, 60000);
+}
 try { S.order.forEach(id => { const l = S.leagues[id]; if (l && !l.demo && !(l.history && l.history.length)) recordHistory(l); }); } catch (e) {}
 ensureLeague();
 route();
