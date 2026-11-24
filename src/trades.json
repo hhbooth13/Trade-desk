@@ -1,5 +1,5 @@
 {
-  "note": "Trades the ESPN sync can't see (pick trades, trades reported by league members). Teams match by name or by who rosters the players now.",
+  "note": "Trades the ESPN sync can't see (pick trades, trades reported by league members). Teams match by name or by who rosters the players now. A team of \"@me\" means the user's own team in the app.",
   "trades": [
     {
       "league": "dynasty",
@@ -46,6 +46,31 @@
                 "Certified Turtle"
               ]
             }
+          ]
+        }
+      ]
+    },
+    {
+      "league": "dynasty",
+      "date": "2026-11-23",
+      "sides": [
+        {
+          "team": "@me",
+          "got": [
+            "Marvin Harrison Jr.",
+            {
+              "pick": [
+                2028,
+                1,
+                "Freeeeda"
+              ]
+            }
+          ]
+        },
+        {
+          "team": "Freeeeda",
+          "got": [
+            "DJ Moore"
           ]
         }
       ]

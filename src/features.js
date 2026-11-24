@@ -10,7 +10,7 @@ function resolveLeagueTrades(lg, teams) {
   const close = (a, b) => a === b || (a.length > 3 && b.length > 3 && a.slice(0, 3) === b.slice(0, 3) && Math.abs(a.length - b.length) <= 2);
   const fuzzy = nm => { const q = toks(nm); if (q.length < 2) return null; let best = null, bs = 0; teams.forEach(t => { const w = toks(t.name); const hit = q.filter(x => w.some(y => close(x, y))).length / Math.max(q.length, w.length); if (hit > bs) { bs = hit; best = t; } }); return bs >= 0.6 ? best : null; };
   const byName0 = nm => { const q = squash(nm); if (!q) return null; return teams.find(t => squash(t.name) === q || squash(t.owner || '') === q) || teams.find(t => squash(t.name).includes(q) || squash(t.owner || '').split(' ').some(w => w && (w === q || w + 's' === q || q + 's' === w))) || null; };
-  const byName = nm => byName0(nm) || fuzzy(nm);
+  const byName = nm => nm === '@me' ? (teams.find(t => t.id === lg.myTeamId) || null) : byName0(nm) || fuzzy(nm);
   const holder = nm => { const k = nk(nm); for (const t of teams) for (const r of t.roster) if (nk(r[1]) === k) return { t, id: r[0] }; return null; };
   const espnId = nm => { const h = holder(nm); if (h) return h.id; const k = nk(nm); const a = typeof ALLPLAYERS !== 'undefined' && ALLPLAYERS && ALLPLAYERS.players.find(r => nk(r[1]) === k); return a ? a[0] : null; };
   list.forEach(tr => {
@@ -56,7 +56,8 @@ function assetNow(m, pid) {
 }
 
 function tradeGrades(m) {
-  const synced = Array.isArray(m.lg.trades) ? m.lg.trades : [];
+  const covered = t => (m.bakedTrades || []).concat(m.lg.manualTrades || []).some(b => t.items.every(i => b.items.some(j => j.join(':') === i.join(':'))));
+  const synced = (Array.isArray(m.lg.trades) ? m.lg.trades : []).filter(t => !covered(t));
   const manual = (Array.isArray(m.lg.manualTrades) ? m.lg.manualTrades : []).filter(x => !synced.some(s => tradeKey(s.items) === tradeKey(x.items)));
   const baked = (m.bakedTrades || []).filter(x => !synced.concat(manual).some(s => tradeKey(s.items) === tradeKey(x.items)));
   const trades = synced.concat(manual, baked);
