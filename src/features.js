@@ -272,3 +272,49 @@ function leagueRecords(m) {
 }
 
 if (typeof module !== 'undefined' && module.exports) Object.assign(module.exports, { tradeGrades, counterOffers, applyBlock, snapshot, byePlanner, offseasonPlan, mockDraft, rivalChanges, rosterSnapshot, leagueRecords });
+
+/* ---------- Dynasty outlook: how strong each team looks now, next year, and three years out ----------
+   Now: this season's lineup using redraft values (injuries and news included).
+   Later: each player's dynasty value moved along his position's age curve, plus the draft picks a team
+   owns turning into rookies (a pick counts for 55% in its first season, 85% in the next, then 100%). */
+function dynastyOutlook(m) {
+  if (m.lg.type !== 'dynasty') return null;
+  const season = +m.lg.season || new Date().getFullYear();
+  const WIN = [{ k: 0, label: 'Now', year: season }, { k: 1, label: String(season + 1), year: season + 1 }, { k: 3, label: String(season + 3), year: season + 3 }];
+  const today = new Date().toISOString().slice(0, 10);
+  const newsR = new Map(); ((typeof NEWS !== 'undefined' && NEWS && NEWS.items) || []).filter(x => !x.until || x.until >= today).forEach(x => { if (x.espn) newsR.set(String(x.espn), x.redraft); });
+  const nowVal = p => {
+    const a = m.vs.alt && ((p.espn && m.vs.alt.byEspn.get(p.espn)) || m.vs.alt.byKey.get(nk(p.name) + '|' + p.pos));
+    let v = a ? a.value : p.value * 0.8;
+    if (p.inj && INJ_FACTOR[p.inj]) v *= INJ_FACTOR[p.inj];
+    const nr = newsR.get(String(p.espn)); if (typeof nr === 'number') v *= nr;
+    return v;
+  };
+  const later = (p, k) => { if (!p.age || !PEAK_AGE[p.pos]) return p.value * Math.pow(0.9, k); return p.value * ageFactor(p.pos, p.age + k) / ageFactor(p.pos, p.age); };
+  const rows = m.teams.map(t => {
+    const sk = t.players.filter(p => SKILL.includes(p.pos) || p.pos === 'K' || p.pos === 'D/ST');
+    const scores = WIN.map(w => {
+      const proj = sk.map(p => Object.assign({}, p, { pv: w.k === 0 ? nowVal(p) : later(p, w.k) }));
+      let s = lineup(proj, m.lg.slots, 'pv').value;
+      if (w.k > 0) (t.picks || []).forEach(pk => { const yrs = season + w.k - pk.year; if (yrs >= 0) s += 0.5 * pk.value * [0.55, 0.85, 1][Math.min(2, yrs)]; });
+      return s;
+    });
+    const st = lineup(t.players, m.lg.slots).starters.map(x => x.p).filter(p => p && p.age);
+    const age = st.length ? st.reduce((a, p) => a + p.age, 0) / st.length : null;
+    const sellers = t.players.filter(p => SKILL.includes(p.pos) && p.age && PEAK_AGE[p.pos] && p.age >= PEAK_AGE[p.pos] + (p.pos === 'RB' ? 1 : 2) && p.value >= 1500).sort((a, b) => b.value - a.value).slice(0, 3);
+    const young = t.players.filter(p => SKILL.includes(p.pos) && p.age && p.age <= 24 && p.value >= 1500).sort((a, b) => b.value - a.value).slice(0, 3);
+    return { team: t, scores, age, picks: (t.picks || []).filter(p => p.round === 1).length, sellers, young };
+  });
+  const n = rows.length;
+  WIN.forEach((w, i) => { rows.slice().sort((a, b) => b.scores[i] - a.scores[i]).forEach((r, j) => { (r.ranks = r.ranks || [])[i] = j + 1; }); });
+  const third = Math.ceil(n / 3), half = Math.ceil(n / 2);
+  rows.forEach(r => {
+    const [now, next, far] = r.ranks;
+    const d = now - far;
+    r.label = now <= third && far <= half ? 'Dynasty power' : now <= third ? 'Win now' : now > n - third && far <= half ? 'Rebuilding'
+      : (far <= third && far < now) || (d >= 3 && far <= half) ? 'Rising' : d <= -3 && far > half ? 'Fading' : now > n - third && far > n - third ? 'Stuck' : 'Middle';
+    r.trend = now - far;
+  });
+  rows.sort((a, b) => a.ranks[0] - b.ranks[0]);
+  return { windows: WIN, rows };
+}

@@ -490,3 +490,29 @@ function confirmReset(el) {
   setTimeout(() => { if (el.isConnected) { delete el.dataset.armed; el.textContent = 'Start over'; } }, 3500);
   return false;
 }
+
+/* ---------- League > Outlook (dynasty leagues only) ---------- */
+const OUTLOOK_TIP = { 'Dynasty power': 'Strong now and later. Hard to trade with unless you pay up.', 'Win now': 'Built for this season. Will pay for proven starters and may part with picks or young players.', 'Rebuilding': 'Weak now, strong later. Will sell veterans for picks and young players.', 'Rising': 'Getting better as their young core grows up.', 'Fading': 'Fine now, but the roster ages out soon. A good team to sell your veterans to before they notice.', 'Stuck': 'Weak now and later. Most open to a shake-up trade.', 'Middle': 'In between. Could tip either way with one big move.' };
+const OUTLOOK_HUE = { 'Dynasty power': 150, 'Win now': 195, 'Rising': 120, 'Rebuilding': 265, 'Fading': 35, 'Stuck': 355, 'Middle': 220 };
+function viewOutlook(m) {
+  const o = dynastyOutlook(m);
+  if (!o) return '<section class="card"><h3>Dynasty outlook</h3><p class="muted">Outlook is for dynasty leagues. Switch to your dynasty league at the top.</p></section>';
+  const n = o.rows.length;
+  const rk = (r, n) => '<span class="rank ' + (r <= Math.ceil(n / 3) ? 'good' : r > n - Math.ceil(n / 3) ? 'bad' : 'mid') + '">' + ord(r) + '</span>';
+  const arrow = d => d > 1 ? '<span class="pos-d small">▲' + d + '</span>' : d < -1 ? '<span class="neg-d small">▼' + -d + '</span>' : '<span class="muted small">–</span>';
+  const tag = l => '<span class="otag" style="--h:' + OUTLOOK_HUE[l] + '" title="' + esc(OUTLOOK_TIP[l]) + '">' + l + '</span>';
+  const table = '<div class="card tablewrap"><table class="league outlook"><thead><tr><th>Team</th>' + o.windows.map(w => '<th class="c">' + w.label + '</th>').join('') + '<th class="c hide-sm">Trend</th><th class="c hide-sm">Age</th><th class="c hide-sm">1sts</th></tr></thead><tbody>' +
+    o.rows.map(r => '<tr class="' + (r.team.id === m.lg.myTeamId ? 'me' : '') + '"><td><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<div><button class="link" data-act="openTeam" data-id="' + r.team.id + '">' + teamName(r.team) + '</button><div>' + tag(r.label) + '</div></div></div></td>' +
+      r.ranks.map(x => '<td class="c">' + rk(x, n) + '</td>').join('') + '<td class="c hide-sm">' + arrow(r.trend) + '</td><td class="c num hide-sm">' + (r.age ? r.age.toFixed(1) : '–') + '</td><td class="c num hide-sm">' + r.picks + '</td></tr>').join('') + '</tbody></table></div>';
+  const me = o.rows.find(r => r.team.id === m.lg.myTeamId);
+  const mine = me ? '<section class="card"><h3>Your outlook</h3><div class="row" style="margin:0 0 6px">' + tag(me.label) + '<span class="small">' + esc(OUTLOOK_TIP[me.label]) + '</span></div><p class="small" style="margin:0">' + o.windows.map((w, i) => w.label + ': <b>' + ord(me.ranks[i]) + '</b>').join(' · ') + (me.age ? ' · starters average ' + me.age.toFixed(1) + ' years old' : '') + '</p></section>' : '';
+  const sellers = o.rows.filter(r => (r.label === 'Rebuilding' || r.label === 'Stuck' || r.label === 'Rising') && r.team.id !== m.lg.myTeamId && r.sellers.length);
+  const buyers = o.rows.filter(r => (r.label === 'Win now' || r.label === 'Fading' || r.label === 'Dynasty power') && r.team.id !== m.lg.myTeamId && r.young.length);
+  const chip = p => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + ' <span class="muted">' + p.age.toFixed(0) + '</span> <b>' + fmt(p.value) + '</b></span>';
+  const market = (sellers.length ? '<section class="card mt"><h3>Veterans for sale</h3><p class="muted small">Teams whose window is later than now, and the veterans past their prime they should be willing to move for picks or young players.</p>' +
+    sellers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="grade-got">' + r.sellers.map(chip).join('') + '</div></div>').join('') + '</section>' : '') +
+    (buyers.length ? '<section class="card mt"><h3>Teams buying now</h3><p class="muted small">Teams built for this season. They’re the ones to sell your veterans to, and they may give up young players or picks.</p>' +
+    buyers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="small muted">Young players they could move: </div><div class="grade-got">' + r.young.map(chip).join('') + '</div></div>').join('') + '</section>' : '');
+  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years age every player along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third.</p>' +
+    mine + table + market;
+}
