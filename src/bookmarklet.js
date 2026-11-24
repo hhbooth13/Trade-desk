@@ -89,7 +89,7 @@
       return {
         id: t.id,
         name: t.name || ((t.location || '') + ' ' + (t.nickname || '')).trim() || ('Team ' + t.id),
-        abbrev: t.abbrev || '',
+        abbrev: t.abbrev || '', logo: /^https?:\/\//.test(t.logo || '') ? t.logo.replace(/^http:/, 'https:') : '',
         owner: (t.owners || []).map(x => mem[x]).filter(Boolean).join(', '),
         mine: !!sw && (t.owners || []).some(x => String(x).toUpperCase() === sw),
         w: o.wins || 0, l: o.losses || 0, t: o.ties || 0, pf: Math.round(o.pointsFor || 0),

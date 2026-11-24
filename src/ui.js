@@ -188,8 +188,15 @@ function fteamAvatar(t, size) {
   if (!t) return '';
   let h = 0; for (const ch of String(t.name || '')) h = (h * 31 + ch.charCodeAt(0)) % 360;
   const txt = String(t.abbrev || t.name || '?').slice(0, 4);
-  return '<span class="av ' + (size || '') + '" style="background:hsl(' + h + ' 55% 34%);--ring:hsl(' + h + ' 65% 62%);' + (txt.length > 3 ? 'font-size:10px' : '') + '" aria-hidden="true">' + esc(txt) + '</span>';
+  const logo = /^https:\/\//.test(t.logo || '') && !BADLOGO.has(t.logo) ? '<img class="av-img" src="' + esc(t.logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
+  return '<span class="av ' + (size || '') + (logo ? ' has-img' : '') + '" style="background:hsl(' + h + ' 55% 34%);--ring:hsl(' + h + ' 65% 62%);' + (txt.length > 3 ? 'font-size:10px' : '') + '" aria-hidden="true">' + esc(txt) + logo + '</span>';
 }
+/* Team pictures uploaded in ESPN. If one can't load (or the page blocks outside images), fall back to initials. */
+const BADLOGO = new Set();
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (img && img.classList && img.classList.contains('av-img')) { BADLOGO.add(img.getAttribute('src')); const p = img.parentNode; img.remove(); if (p) p.classList.remove('has-img'); }
+}, true);
 const INJ_SHORT = { INJURY_RESERVE: 'IR', OUT: 'O', QUESTIONABLE: 'Q', DOUBTFUL: 'D', SUSPENSION: 'SUSP', DAY_TO_DAY: 'DTD' };
 function playerLine(p, opts) {
   opts = opts || {};
@@ -374,7 +381,7 @@ function viewCalc(m) {
 
 function standingsCard(m) {
   const po = playoffOdds(m);
-  if (!po) return '<section class="card"><h3>Standings</h3><p class="muted small">Standings with playoff odds need your league\u2019s schedule. Reinstall the sync bookmark from the Sync tab, then sync again.</p></section>';
+  if (!po) return '<section class="card"><h3>Standings</h3><p class="muted small">Standings with playoff odds need your league\u2019s schedule. ' + resyncTip() + '</p></section>';
   const me = m.lg.myTeamId;
   return '<section class="card tablewrap"><div style="padding:16px 16px 0"><h3>Standings and playoff odds</h3><p class="muted small" style="margin:0 0 8px">' + po.spots + ' teams make the playoffs. Odds come from simulating the ' + po.remaining + ' regular-season games left 4,000 times, using each team\u2019s scoring so far and its current lineup.</p></div>' +
     '<table class="league"><thead><tr><th>#</th><th>Team</th><th class="num">W-L</th><th class="num hide-sm">PF/G</th><th>Playoffs</th><th class="num hide-sm">Proj W</th><th class="num hide-sm">#1 seed</th></tr></thead><tbody>' +
@@ -392,11 +399,11 @@ function viewLeague(m) {
     SKILL.map(p => '<td class="c">' + rankChip(t.rank[p], n) + '</td>').join('') + '</tr>').join('');
   return '<section class="head-row"><h2>' + esc(m.lg.name) + '</h2></section>' + standingsCard(m) + '<h3 class="mt">Power rankings</h3>' +
     '<p class="muted small lead">Ranked by starting-lineup trade value' + (dynL ? '; Roster includes draft picks' : '') + '. Position columns show where each team’s starters rank. Green means top third, red bottom third: red teams are your trade partners for that position.</p>' +
-    '<div class="card tablewrap"><table class="league"><thead><tr><th>#</th><th>Team</th><th>Record</th><th>Starters</th><th class="hide-sm">Roster</th>' + (dynL ? '<th class="hide-sm">Picks</th>' : '') + SKILL.map(p => '<th class="c">' + p + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + managersCard(m) + rivalsCard(m);
+    '<div class="card tablewrap"><table class="league"><thead><tr><th>#</th><th>Team</th><th>Record</th><th>Starters</th><th class="hide-sm">Roster</th>' + (dynL ? '<th class="hide-sm">Picks</th>' : '') + SKILL.map(p => '<th class="c">' + p + '</th>').join('') + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + managersCard(m);
 }
 
 function viewHistory(m) {
-  return '<section class="head-row"><h2>History</h2></section><p class="muted small lead">Every trade in ' + esc(m.lg.name) + ' graded by today\u2019s values, plus the league\u2019s record book.</p>' + gradesCard(m) + recordsCard(m);
+  return '<section class="head-row"><h2>History</h2></section><p class="muted small lead">Every trade in ' + esc(m.lg.name) + ' graded by today\u2019s values, your rivalries, and the league\u2019s record book.</p>' + rivalsCard(m) + gradesCard(m) + recordsCard(m);
 }
 
 function pwaSteps() {
@@ -448,7 +455,7 @@ function viewWeekly(m) {
   const me = m.byId.get(m.lg.myTeamId);
   if (!me) return '<section class="card"><h2>Weekly</h2><p>Choose your team first.</p>' + teamSelect('setMine', null, 'Pick your team') + '</section>';
   const dyn = m.lg.type === 'dynasty', n = m.teams.length;
-  const resync = '<p class="muted small">Your last sync didn\u2019t include this data. Reinstall the sync bookmark from the Sync tab (it was updated), then sync again.</p>';
+  const resync = '<p class="muted small">Your last sync didn\u2019t include this data. ' + resyncTip() + '</p>';
   // Start / sit
   const ss = startSit(m, me);
   let ssHtml;
@@ -512,7 +519,7 @@ function managersCard(m) {
   const posList = o => Object.entries(o).sort((a, b) => b[1] - a[1]).map(([p, k]) => p + (k > 1 ? ' ×' + k : '')).join(', ') || '—';
   return '<section class="card mt"><h3>Managers</h3>' +
     (best.length ? '<div class="partners"><b>Best trade partners for you:</b><ol>' + best.map(x => '<li><b>' + teamName(x.t) + '</b>: ' + esc(x.reasons.slice(0, 2).join('; ')) + (x.trades ? '; active trader (' + x.trades + ' trade' + (x.trades > 1 ? 's' : '') + ')' : '') + '. <button class="link small" data-act="tradeWith" data-id="' + x.t.id + '">See trades</button></li>').join('') + '</ol></div>' : '') +
-    (tracked ? '' : '<p class="muted small">Trade history comes with the updated sync bookmark. Reinstall it from the Sync tab and sync again to see who trades, and what they buy and sell.</p>') +
+    (tracked ? '' : '<p class="muted small">Trade history comes with the updated sync bookmark. ' + resyncTip() + '</p>') +
     '<div class="tablewrap"><table class="league"><thead><tr><th>Team</th>' + (dyn ? '<th>Profile</th>' : '') + '<th class="num">Starter age</th><th>Needs</th><th>Can spare</th>' + (tracked ? '<th class="num">Trades</th><th>Bought</th><th>Sold</th>' : '') + '</tr></thead><tbody>' +
     profs.map(x => '<tr class="' + (me && x.t.id === me.id ? 'me' : '') + '"><td><div class="tcell">' + fteamAvatar(x.t, 'sm') + '<div><button class="link" data-act="openTeam" data-id="' + x.t.id + '">' + teamName(x.t) + '</button>' + (x.history.length ? '<div class="small muted">Last: got ' + esc(x.history[0].got.join(', ') || 'nothing') + ' for ' + esc(x.history[0].sent.join(', ') || 'nothing') + '</div>' : '') + '</div></div></td>' +
       (dyn ? '<td><span class="fair ' + (x.mode === 'contend' ? 'good' : 'mid') + '">' + (x.mode === 'contend' ? 'Contender' : 'Rebuilder') + '</span></td>' : '') +
@@ -725,6 +732,7 @@ function doImport(txt) {
     if (msg) { msg.className = 'small bad-t'; msg.textContent = r.msg; }
   }
 }
+function resyncTip() { return PWA ? 'Tap the sync button at the top to load it.' : 'Reinstall the sync bookmark from the Sync tab, then sync again.'; }
 function findPlayer(m, id) {
   return m.players.get(id) || (m.freeAgents || []).find(p => p.id === id) || globalPlayer(m, id) || m.vs.byId.get(id) || null;
 }

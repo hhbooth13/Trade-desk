@@ -106,7 +106,7 @@ function rivalsCard(m) {
 
 function recordsCard(m) {
   const rec = leagueRecords(m);
-  if (!rec) return '<section class="card mt"><h3>League records</h3><p class="muted small">Records come from your league’s schedule. Reinstall the sync bookmark and sync again.</p></section>';
+  if (!rec) return '<section class="card mt"><h3>League records</h3><p class="muted small">Records come from your league’s schedule. ' + resyncTip() + '</p></section>';
   return '<section class="card mt"><h3>League records</h3><div class="records">' + rec.map(r => '<div class="recd"><span class="tile-k">' + esc(r.k) + '</span><b class="tile-v">' + esc(r.v) + '</b><div class="tcell small">' + fteamAvatar(r.who, 'sm') + '<span><b>' + teamName(r.who) + '</b><br><span class="muted">' + esc(r.note) + '</span></span></div></div>').join('') + '</div></section>';
 }
 

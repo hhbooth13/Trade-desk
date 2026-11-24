@@ -39,7 +39,7 @@ async function espnSync(id, progress) {
   const teams = (L.teams || []).map(t => {
     const o = (t.record || {}).overall || {};
     return {
-      id: t.id, name: t.name || ((t.location || '') + ' ' + (t.nickname || '')).trim() || ('Team ' + t.id), abbrev: t.abbrev || '',
+      id: t.id, name: t.name || ((t.location || '') + ' ' + (t.nickname || '')).trim() || ('Team ' + t.id), abbrev: t.abbrev || '', logo: /^https?:\/\//.test(t.logo || '') ? t.logo.replace(/^http:/, 'https:') : '',
       owner: (t.owners || []).map(x => mem[x]).filter(Boolean).join(', '), mine: false,
       w: o.wins || 0, l: o.losses || 0, t: o.ties || 0, pf: Math.round(o.pointsFor || 0),
       roster: ((t.roster || {}).entries || []).map(e => {
