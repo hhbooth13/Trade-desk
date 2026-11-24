@@ -235,7 +235,7 @@ function playerLine(p, opts) {
   const est = p.est ? '<span class="estb' + (p.est === 'manual' ? ' man' : '') + '" title="' + esc(p.estWhy || '') + '">' + (p.est === 'manual' ? 'your value' : p.est === 'season' ? 'out for season' : 'est.') + '</span>' : '';
   return '<div class="pl" data-act="player" data-id="' + esc(p.id) + '" role="button" tabindex="0">' + avatar(p, opts.size) + '<div class="pl-text"><div class="pl-main"><span class="pl-name">' + esc(p.name) + '</span>' +
     (p.inj ? '<span class="inj" title="' + esc(p.inj.replace('_', ' ').toLowerCase()) + '">' + esc(INJ_SHORT[p.inj] || p.inj.slice(0, 3)) + '</span>' : '') + '</div>' +
-    '<div class="pl-meta">' + posChip(p.pos) + (p.pos === 'PICK' ? '<span>' + esc(p.team || 'Draft pick') + '</span>' : '') + dyn + trendTag(p.trend, p.value) + est + (p.news ? '<span class="newsb" title="' + esc(p.news.note) + '">news</span>' : '') + '</div></div></div>';
+    '<div class="pl-meta">' + posChip(p.pos) + (p.pos === 'PICK' ? '<span>' + esc(p.team || 'Draft pick') + '</span>' : teamBadge(p.team)) + dyn + trendTag(p.trend, p.value) + est + (p.news ? '<span class="newsb" title="' + esc(p.news.note) + '">news</span>' : '') + '</div></div></div>';
 }
 const teamName = t => esc(t ? t.name : '');
 
