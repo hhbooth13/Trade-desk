@@ -313,7 +313,12 @@ async function loadLive(p) {
         if (rec != null && +rec) bits.push(rec + ' rec ' + cyd + ' yds' + (+ctd ? ', ' + ctd + ' TD' : ''));
         return bits.join(' · ') || labels.slice(0, 3).map((l, i) => l + ' ' + row.stats[i]).join(' · ');
       };
-      games = '<h3 class="mt">Last ' + Math.min(5, evs.length) + ' games</h3><table class="roster"><tbody>' + evs.slice(0, 5).map(row => { const e = (gl.events || {})[row.eventId] || {}; return '<tr><td class="slot">Wk ' + (e.week || '') + '</td><td class="small">' + esc((e.atVs || '') + ' ' + ((e.opponent || {}).abbreviation || '')) + ' <span class="' + (e.gameResult === 'W' ? 'pos-d' : 'neg-d') + '">' + esc((e.gameResult || '') + ' ' + (e.score || '')) + '</span></td><td class="small">' + esc(line(row)) + '</td></tr>'; }).join('') + '</tbody></table>';
+      /* Standard PPR: 1 per catch, 0.1 per rush/rec yard, 0.04 per pass yard, 6 per rush/rec TD, 4 per pass TD, -2 per INT or lost fumble. */
+      const num = v => { const x = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(x) ? x : 0; };
+      const ppr = row => { const g = k => num(pick(row, k)); return g('passingYards') * 0.04 + g('passingTouchdowns') * 4 - g('interceptions') * 2 + g('rushingYards') * 0.1 + g('rushingTouchdowns') * 6 + g('receptions') + g('receivingYards') * 0.1 + g('receivingTouchdowns') * 6 - g('fumblesLost') * 2; };
+      const skill = SKILL.includes(p.pos);
+      const shown = evs.slice(0, 5), avg = skill ? shown.reduce((s, r) => s + ppr(r), 0) / shown.length : 0;
+      games = '<h3 class="mt">Last ' + Math.min(5, evs.length) + ' games' + (skill ? ' · ' + avg.toFixed(1) + ' PPR avg' : '') + '</h3><table class="roster"><tbody>' + shown.map(row => { const e = (gl.events || {})[row.eventId] || {}; return '<tr><td class="slot">Wk ' + (e.week || '') + '</td><td class="small">' + esc((e.atVs || '') + ' ' + ((e.opponent || {}).abbreviation || '')) + ' <span class="' + (e.gameResult === 'W' ? 'pos-d' : 'neg-d') + '">' + esc((e.gameResult || '') + ' ' + (e.score || '')) + '</span></td><td class="small">' + esc(line(row)) + '</td>' + (skill ? '<td class="num"><b class="ppr' + (ppr(row) >= 20 ? ' hi' : ppr(row) < 8 ? ' lo' : '') + '">' + ppr(row).toFixed(1) + '</b><div class="small muted">PPR</div></td>' : '') + '</tr>'; }).join('') + '</tbody></table>';
     }
     el.innerHTML = (bio ? '<p class="small muted">' + esc(bio) + '</p>' : '') + (parts.length ? '<h3 class="mt">' + (season || '') + ' season' + (gp.GP ? ' · ' + gp.GP + ' games' : '') + '</h3><p class="small">' + parts.map(esc).join('<br>') + '</p>' : '') + games + '<p class="small muted">Live from ESPN.</p>';
   } catch (e) { el.innerHTML = '<p class="muted small">Couldn’t load ESPN stats right now.</p>'; }

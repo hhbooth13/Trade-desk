@@ -489,6 +489,7 @@ tr.me td { background: rgba(56, 200, 245, .08); }
 .plan-h::before { display: none; }
 .plan-steps { margin: 6px 0 0; padding-left: 20px; } .plan-steps li { margin: 6px 0; }
 .plan-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.ppr { font: 700 15px var(--display); } .ppr.hi { color: var(--good); } .ppr.lo { color: var(--bad); }
 .otag { display: inline-block; margin-top: 3px; font: 700 10px var(--display); letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; color: hsl(var(--h) 85% 68%); background: hsl(var(--h) 80% 55% / .14); box-shadow: inset 0 0 0 1px hsl(var(--h) 80% 60% / .35); white-space: nowrap; cursor: help; }
 .outlook td.c, .outlook th.c { text-align: center; }
 .mkt { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
@@ -2247,7 +2248,12 @@ async function loadLive(p) {
         if (rec != null && +rec) bits.push(rec + ' rec ' + cyd + ' yds' + (+ctd ? ', ' + ctd + ' TD' : ''));
         return bits.join(' · ') || labels.slice(0, 3).map((l, i) => l + ' ' + row.stats[i]).join(' · ');
       };
-      games = '<h3 class="mt">Last ' + Math.min(5, evs.length) + ' games</h3><table class="roster"><tbody>' + evs.slice(0, 5).map(row => { const e = (gl.events || {})[row.eventId] || {}; return '<tr><td class="slot">Wk ' + (e.week || '') + '</td><td class="small">' + esc((e.atVs || '') + ' ' + ((e.opponent || {}).abbreviation || '')) + ' <span class="' + (e.gameResult === 'W' ? 'pos-d' : 'neg-d') + '">' + esc((e.gameResult || '') + ' ' + (e.score || '')) + '</span></td><td class="small">' + esc(line(row)) + '</td></tr>'; }).join('') + '</tbody></table>';
+      /* Standard PPR: 1 per catch, 0.1 per rush/rec yard, 0.04 per pass yard, 6 per rush/rec TD, 4 per pass TD, -2 per INT or lost fumble. */
+      const num = v => { const x = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(x) ? x : 0; };
+      const ppr = row => { const g = k => num(pick(row, k)); return g('passingYards') * 0.04 + g('passingTouchdowns') * 4 - g('interceptions') * 2 + g('rushingYards') * 0.1 + g('rushingTouchdowns') * 6 + g('receptions') + g('receivingYards') * 0.1 + g('receivingTouchdowns') * 6 - g('fumblesLost') * 2; };
+      const skill = SKILL.includes(p.pos);
+      const shown = evs.slice(0, 5), avg = skill ? shown.reduce((s, r) => s + ppr(r), 0) / shown.length : 0;
+      games = '<h3 class="mt">Last ' + Math.min(5, evs.length) + ' games' + (skill ? ' · ' + avg.toFixed(1) + ' PPR avg' : '') + '</h3><table class="roster"><tbody>' + shown.map(row => { const e = (gl.events || {})[row.eventId] || {}; return '<tr><td class="slot">Wk ' + (e.week || '') + '</td><td class="small">' + esc((e.atVs || '') + ' ' + ((e.opponent || {}).abbreviation || '')) + ' <span class="' + (e.gameResult === 'W' ? 'pos-d' : 'neg-d') + '">' + esc((e.gameResult || '') + ' ' + (e.score || '')) + '</span></td><td class="small">' + esc(line(row)) + '</td>' + (skill ? '<td class="num"><b class="ppr' + (ppr(row) >= 20 ? ' hi' : ppr(row) < 8 ? ' lo' : '') + '">' + ppr(row).toFixed(1) + '</b><div class="small muted">PPR</div></td>' : '') + '</tr>'; }).join('') + '</tbody></table>';
     }
     el.innerHTML = (bio ? '<p class="small muted">' + esc(bio) + '</p>' : '') + (parts.length ? '<h3 class="mt">' + (season || '') + ' season' + (gp.GP ? ' · ' + gp.GP + ' games' : '') + '</h3><p class="small">' + parts.map(esc).join('<br>') + '</p>' : '') + games + '<p class="small muted">Live from ESPN.</p>';
   } catch (e) { el.innerHTML = '<p class="muted small">Couldn’t load ESPN stats right now.</p>'; }
