@@ -22,7 +22,7 @@ def make(pwa):
     assert '</script' not in core + ui + feat + r + ui2 + sync
     if pwa:
         html = html.replace('<meta name="viewport" content="width=device-width, initial-scale=1">', '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">')
-        html = html.replace('<meta name="theme-color" content="#191c22">', '''<meta name="theme-color" content="#191c22">
+        html = html.replace('<meta name="theme-color" content="#121826">', '''<meta name="theme-color" content="#121826">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

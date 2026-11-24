@@ -188,9 +188,9 @@ function teamBadge(abbr) {
 function fteamAvatar(t, size) {
   if (!t) return '';
   let h = 0; for (const ch of String(t.name || '')) h = (h * 31 + ch.charCodeAt(0)) % 360;
-  const txt = String(t.abbrev || t.name || '?').slice(0, 4);
+  const txt = String(t.abbrev || t.name || '?').slice(0, size === 'xs' ? 2 : 4);
   const logo = /^https:\/\//.test(t.logo || '') && !BADLOGO.has(t.logo) ? '<img class="av-img" src="' + esc(t.logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
-  return '<span class="av ' + (size || '') + (logo ? ' has-img' : '') + '" style="background:hsl(' + h + ' 55% 34%);--ring:hsl(' + h + ' 65% 62%);' + (txt.length > 3 ? 'font-size:10px' : '') + '" aria-hidden="true">' + esc(txt) + logo + '</span>';
+  return '<span class="av ' + (size || '') + (logo ? ' has-img' : '') + '" style="background:hsl(' + h + ' 55% 34%);--ring:hsl(' + h + ' 65% 62%);' + (txt.length > 3 && size !== 'xs' ? 'font-size:10px' : '') + '" aria-hidden="true">' + esc(txt) + logo + '</span>';
 }
 /* Team pictures uploaded in ESPN. If one can't load (or the page blocks outside images), fall back to initials. */
 const BADLOGO = new Set();
@@ -571,7 +571,7 @@ function viewScout() {
       '<div class="pr-main"><div class="pl-main">' + posChip(pos) + '<span class="pl-name">' + esc(name) + '</span></div>' +
       '<div class="pl-meta pr-bio"><span>' + esc(school) + '</span><span>' + esc(ht) + ', ' + wt + ' lbs</span><span>' + esc(cls) + '</span><span class="agechip' + (ag.draft < 21.5 ? ' young' : ag.draft >= 23 ? ' old' : '') + '" title="' + (ag.est ? 'Birth date not published; estimated from class year' : 'Born ' + esc(r[9])) + '">' + (ag.est ? '~' : '') + 'Age ' + ag.now.toFixed(1) + ' · ' + ag.draft.toFixed(1) + ' on draft day' + (ag.est ? ' (est.)' : '') + '</span><span>NFL: ' + esc(nfl) + '</span></div>' +
       '<div class="pr-stats">2026: ' + esc(stats) + '</div><p class="pr-note">' + esc(note) + '</p>' + (() => { const br = boardRanks(name); return br.dyn ? '<div class="small muted">Dynasty boards avg <b class="pos-d">#' + br.dyn.avg.toFixed(1) + '</b>' + (br.nfl ? ' · NFL boards avg <b>#' + br.nfl.avg.toFixed(0) + '</b>' : '') + ' · tap for details</div>' : '<div class="small muted">Tap for details</div>'; })() + '</div>' +
-      '<div class="pr-pick"><span class="pk' + (isMine ? ' mine' : '') + '">' + label + '</span>' + (own ? '<div class="small muted">' + (isMine ? 'Your pick' : esc(own.abbrev || own.name)) + '</div>' : '') +
+      '<div class="pr-pick"><span class="pk' + (isMine ? ' mine' : '') + '">' + label + '</span>' + (own ? '<div class="small muted pr-own">' + fteamAvatar(own, 'xs') + (isMine ? 'Your pick' : esc(own.abbrev || own.name)) + '</div>' : '') +
       (mineBoard ? '<div class="mv"><button class="mvb" data-act="mv" data-name="' + esc(name) + '" data-d="-1" aria-label="Move ' + esc(name) + ' up">▲</button><button class="mvb" data-act="mv" data-name="' + esc(name) + '" data-d="1" aria-label="Move ' + esc(name) + ' down">▼</button></div>' : '') + '</div></article>';
   }).join('');
   const myTargets = myPicks.map(p => {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#191c22">
+<meta name="theme-color" content="#121826">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,6 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <title>Trade Desk</title>
 <style>
 /* Layout idea: a phone-first fantasy app. Black chrome, charcoal cards, one blue accent, team-color badges carry identity. Single dark theme by choice. */
@@ -367,6 +368,111 @@ details summary { cursor: pointer; color: var(--accent); font-size: 14px; font-w
   .modal-card { border-radius: 18px 18px 0 0; max-height: 88%; padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* ======================================================================
+   "Night ops" theme: deep navy glass, cyan-to-violet neon accent, a
+   geometric display face for numbers and headings. Layered over the base
+   styles above so every component picks it up.
+   ====================================================================== */
+:root {
+  --bg: #121826; --surface: rgba(30, 39, 58, .72); --surface2: rgba(48, 60, 86, .62); --ink: #eef3ff; --muted: #9aa8c2;
+  --line: rgba(130, 160, 230, .16); --line-hi: rgba(120, 200, 255, .35);
+  --accent: #38c8f5; --accent2: #8b6cff; --accent-ink: #061018; --accent-soft: rgba(56, 200, 245, .13);
+  --grad: linear-gradient(135deg, #38c8f5 0%, #6d8bff 55%, #9b6bff 100%);
+  --glow: 0 0 0 1px rgba(56, 200, 245, .35), 0 6px 24px -6px rgba(56, 200, 245, .45);
+  --chrome: rgba(13, 18, 30, .78); --chrome-ink: #fff;
+  --good: #2ee6a6; --good-soft: rgba(46, 230, 166, .13); --mid: #ffc94a; --mid-soft: rgba(255, 201, 74, .13); --bad: #ff5f7e; --bad-soft: rgba(255, 95, 126, .14);
+  --qb: #ff4f9a; --rb: #22d39a; --wr: #3fa9ff; --te: #ff9b3d;
+  --display: 'Space Grotesk', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(900px 520px at 0% -10%, rgba(56, 200, 245, .16), transparent 60%),
+    radial-gradient(800px 600px at 110% 20%, rgba(139, 108, 255, .16), transparent 60%),
+    linear-gradient(rgba(120, 160, 255, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 160, 255, .035) 1px, transparent 1px);
+  background-size: auto, auto, 32px 32px, 32px 32px;
+  background-attachment: fixed;
+}
+h2 { font-weight: 700; letter-spacing: -.02em; }
+h3 { color: #b8c6e6; letter-spacing: .14em; font-size: 11px; display: flex; align-items: center; gap: 8px; }
+h3::before { content: ''; width: 14px; height: 2px; border-radius: 2px; background: var(--grad); flex: none; box-shadow: 0 0 8px rgba(56, 200, 245, .7); }
+.num, .tile-v, .vbtn, .rank, .pk { font-family: var(--display); letter-spacing: -.01em; }
+
+/* chrome: frosted glass header and tabs */
+.top, .tabs { background: var(--chrome); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border-color: var(--line); }
+.mark { background: var(--grad); color: #071019; box-shadow: 0 0 18px rgba(56, 200, 245, .55); border-radius: 11px; font-family: var(--display); }
+.brand h1 { font-family: var(--display); font-weight: 700; letter-spacing: .02em; }
+.ltab { background: rgba(40, 52, 78, .55); border-color: var(--line); color: #dfe7f7; }
+.ltab:hover { border-color: var(--line-hi); }
+.ltab.on { background: rgba(56, 200, 245, .12); color: #fff; border-color: transparent; box-shadow: var(--glow); }
+.ltab.on small { color: var(--accent); }
+.tabs a.on { color: #fff; border-bottom-color: var(--accent); text-shadow: 0 0 12px rgba(56, 200, 245, .6); }
+.tabs a.on svg { color: var(--accent); filter: drop-shadow(0 0 6px rgba(56, 200, 245, .8)); }
+
+/* glass cards with a thin lit edge on top */
+.card, .tile, .modal-card, .idea, .prospect, .recd {
+  background: var(--surface);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 10px 30px -18px rgba(0, 0, 0, .8);
+  position: relative;
+}
+.card::before, .tile::before, .idea::before {
+  content: ''; position: absolute; left: 18px; right: 18px; top: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 200, 245, .55), rgba(139, 108, 255, .45), transparent);
+  pointer-events: none;
+}
+.recd { background: var(--surface2); }
+.tile-v { font-weight: 700; font-size: 22px; background: linear-gradient(180deg, #fff, #c9d8ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.prospect:hover, .idea:hover { border-color: var(--line-hi); }
+
+/* controls */
+.btn { background: var(--grad); color: #071019; box-shadow: 0 6px 20px -8px rgba(80, 150, 255, .8); font-family: var(--display); letter-spacing: .01em; }
+.btn:hover { filter: brightness(1.08); }
+.btn.ghost { background: rgba(48, 60, 86, .5); color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+.btn.ghost:hover { border-color: var(--line-hi); }
+.btn.danger { background: var(--bad); color: #fff; }
+select, input[type=search], input[type=number], input[type=date], textarea, input[type=text] { background: rgba(18, 26, 42, .7); border: 1px solid var(--line); border-radius: 12px; color: var(--ink); }
+select:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(56, 200, 245, .18); }
+.chip { background: rgba(48, 60, 86, .5); border-color: var(--line); }
+.chip.on { background: rgba(56, 200, 245, .14); color: #fff; border-color: transparent; box-shadow: var(--glow); }
+.chip-team, .own-t, .pr-own { display: inline-flex; align-items: center; gap: 6px; }
+.chip-team { padding: 4px 12px 4px 4px; }
+.mock-team { display: inline-flex; align-items: center; gap: 5px; }
+.av.xs { width: 20px; height: 20px; font-size: 8px; box-shadow: inset 0 0 0 1.5px var(--ring, rgba(255,255,255,.25)); }
+.subtabs { background: rgba(18, 26, 42, .6); border-color: var(--line); border-radius: 14px; backdrop-filter: blur(12px); }
+.subtabs a { font-family: var(--display); border-radius: 10px; }
+.subtabs a.on { background: rgba(56, 200, 245, .14); color: #fff; box-shadow: var(--glow); }
+
+/* identity */
+.av { box-shadow: inset 0 0 0 2px var(--ring, rgba(255,255,255,.25)), 0 0 0 1px rgba(0,0,0,.3); }
+.av.has-img { box-shadow: 0 0 0 1.5px rgba(120, 200, 255, .5), 0 0 10px -2px rgba(56, 200, 245, .5); }
+.pos { border-radius: 6px; box-shadow: 0 0 10px -3px currentColor; }
+.pos-QB { box-shadow: 0 0 10px -3px var(--qb); } .pos-RB { box-shadow: 0 0 10px -3px var(--rb); } .pos-WR { box-shadow: 0 0 10px -3px var(--wr); } .pos-TE { box-shadow: 0 0 10px -3px var(--te); }
+.rank.good, .fair.good { box-shadow: inset 0 0 0 1px rgba(46, 230, 166, .35); }
+.rank.bad { box-shadow: inset 0 0 0 1px rgba(255, 95, 126, .35); }
+.pbar-track { background: rgba(18, 26, 42, .8); }
+.banner { background: linear-gradient(135deg, rgba(56, 200, 245, .12), rgba(139, 108, 255, .12)); border-color: var(--line-hi); }
+.newsb { background: var(--grad); color: #071019; }
+.modal-card { background: rgba(22, 30, 48, .92); border-color: var(--line-hi); }
+#modal { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.gr:hover { background: rgba(56, 200, 245, .08); }
+table th { color: #b8c6e6; letter-spacing: .08em; }
+tr.me td { background: rgba(56, 200, 245, .08); }
+
+/* phones: floating glass dock */
+@media (max-width: 760px) {
+  .tabs { left: 10px; right: 10px; bottom: calc(8px + env(safe-area-inset-bottom)); border: 1px solid var(--line-hi); border-radius: 22px; padding: 4px; box-shadow: 0 12px 40px -10px rgba(0, 0, 0, .9), 0 0 0 1px rgba(255,255,255,.03) inset; }
+  .tabs a { border-radius: 16px; position: relative; }
+  .tabs a.on { background: rgba(56, 200, 245, .12); color: #fff; }
+  .tabs a.on::after { content: ''; position: absolute; top: 2px; left: 30%; right: 30%; height: 2px; border-radius: 2px; background: var(--grad); box-shadow: 0 0 8px rgba(56, 200, 245, .9); }
+  body { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .card, .tile, .top, .tabs, .modal-card { backdrop-filter: none; -webkit-backdrop-filter: none; background-color: #1d2639; }
+}
 .top { padding-top: calc(12px + env(safe-area-inset-top)); padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right)); }
 </style>
 </head>
@@ -1770,7 +1876,7 @@ function mockCard(m) {
   let round = 0;
   return '<section class="card"><div class="head-row" style="margin-bottom:8px"><h3 style="margin:0">' + md.year + ' mock draft</h3><div class="ctrl"><button class="btn ghost" data-act="mockRerun">' + (ui.mockSeed ? 'Run again' : 'Add surprises') + '</button>' + (ui.mockSeed ? '<button class="btn ghost" data-act="mockReset">Straight board</button>' : '') + '</div></div>' +
     '<p class="muted small">Order from current standings (worst picks first every round), traded picks included. Other teams take the best player left on the consensus board, leaning toward their needs. Your picks follow ' + (mine ? 'your board' : 'the consensus board') + '.</p>' +
-    md.out.map(x => { const head = x.pick.round !== round ? '<div class="tierh">Round ' + (round = x.pick.round) + '</div>' : ''; return head + '<div class="mock' + (x.mine ? ' me' : '') + '"><span class="pk' + (x.mine ? ' mine' : '') + '">' + x.pick.round + '.' + String(x.pick.pickNo).padStart(2, '0') + '</span>' + fteamAvatar(x.team, 'sm') + '<span class="mock-team">' + esc(x.team ? x.team.abbrev || x.team.name : '') + '</span>' + posChip(x.r[1]) + '<b class="mock-name">' + esc(x.r[0]) + '</b><span class="muted small">' + esc(x.r[2]) + '</span>' + (Math.abs(x.reach) >= 4 ? '<span class="small ' + (x.reach > 0 ? 'neg-d' : 'pos-d') + '">' + (x.reach > 0 ? 'reach' : 'value') + '</span>' : '') + '</div>'; }).join('') + '</section>';
+    md.out.map(x => { const head = x.pick.round !== round ? '<div class="tierh">Round ' + (round = x.pick.round) + '</div>' : ''; return head + '<div class="mock' + (x.mine ? ' me' : '') + '"><span class="pk' + (x.mine ? ' mine' : '') + '">' + x.pick.round + '.' + String(x.pick.pickNo).padStart(2, '0') + '</span>' + fteamAvatar(x.team, 'sm') + '<span class="mock-team">' + (x.team ? fteamAvatar(x.team, 'xs') : '') + '<span>' + esc(x.team ? x.team.abbrev || x.team.name : '') + '</span></span>' + posChip(x.r[1]) + '<b class="mock-name">' + esc(x.r[0]) + '</b><span class="muted small">' + esc(x.r[2]) + '</span>' + (Math.abs(x.reach) >= 4 ? '<span class="small ' + (x.reach > 0 ? 'neg-d' : 'pos-d') + '">' + (x.reach > 0 ? 'reach' : 'value') + '</span>' : '') + '</div>'; }).join('') + '</section>';
 }
 
 function rivalsCard(m) {
@@ -1778,7 +1884,7 @@ function rivalsCard(m) {
   const me = m.lg.myTeamId;
   const ch = rivalChanges(m, m.lg.prev);
   const list = m.teams.filter(t => rivals.includes(t.id));
-  const follow = '<div class="row">' + m.teams.filter(t => t.id !== me).map(t => '<button class="chip' + (rivals.includes(t.id) ? ' on' : '') + '" data-act="rival" data-id="' + t.id + '">' + esc(t.abbrev || t.name) + '</button>').join('') + '</div>';
+  const follow = '<div class="row">' + m.teams.filter(t => t.id !== me).map(t => '<button class="chip' + (rivals.includes(t.id) ? ' on' : '') + ' chip-team" data-act="rival" data-id="' + t.id + '">' + fteamAvatar(t, 'xs') + '<span>' + esc(t.abbrev || t.name) + '</span></button>').join('') + '</div>';
   const body = !list.length ? '<p class="muted small">Tap teams above to follow them.</p>' : list.map(t => {
     const c = ch ? ch.find(x => x.t.id === t.id) : null;
     return '<div class="rival"><div class="tcell">' + fteamAvatar(t) + '<div><b>' + teamName(t) + '</b><div class="small muted">' + t.w + '–' + t.l + ' · starters ' + ord(t.rank.starter) + ' · roster ' + ord(t.rank.total) + (c && c.dTotal != null ? ' · value <span class="' + (c.dTotal >= 0 ? 'pos-d' : 'neg-d') + '">' + sgn(c.dTotal) + '</span> since last sync' : '') + '</div></div></div>' +
@@ -1892,7 +1998,7 @@ function openSearch() {
     m.vs.list.forEach(x => { if (x.pos !== 'PICK' && !pool.seen.has(x.id) && !hits.some(h => h.id === x.id) && nk(x.name).includes(q)) hits.push(Object.assign({ owner: null }, x)); });
     hits.sort((a, b) => (nk(a.name).startsWith(q) ? 0 : 1) - (nk(b.name).startsWith(q) ? 0 : 1) || b.value - a.value);
     const pros = ROOKIES.filter(r => nk(r[0]).includes(q)).slice(0, 5);
-    const status = p => { if (p.owner != null) { const t = m.byId.get(p.owner); return t ? (t.id === m.lg.myTeamId ? '<span class="fair good">Yours</span>' : '<span class="tb" style="background:#4a5160">' + esc(t.abbrev || t.name) + '</span>') : ''; } return '<span class="fair mid">' + (p.waivers ? 'Waivers' : 'Free agent') + '</span>'; };
+    const status = p => { if (p.owner != null) { const t = m.byId.get(p.owner); return t ? (t.id === m.lg.myTeamId ? '<span class="fair good">Yours</span>' : '<span class="own-t">' + fteamAvatar(t, 'xs') + esc(t.abbrev || t.name) + '</span>') : ''; } return '<span class="fair mid">' + (p.waivers ? 'Waivers' : 'Free agent') + '</span>'; };
     box.innerHTML = (hits.slice(0, 25).map(p => '<button class="gr" data-act="gplayer" data-id="' + esc(p.id) + '">' + playerLine(p) + '<span class="gr-r">' + status(p) + '<b class="num">' + fmt(p.value) + '</b></span></button>').join('') +
       (pros.length ? '<div class="tierh">2027 prospects</div>' + pros.map(r => '<button class="gr" data-act="prospect" data-name="' + esc(r[0]) + '"><div class="pl">' + '<span class="av" style="background:var(--' + r[1].toLowerCase() + ')">' + esc(initials(r[0])) + '</span><div class="pl-text"><div class="pl-main"><span class="pl-name">' + esc(r[0]) + '</span></div><div class="pl-meta">' + posChip(r[1]) + '<span>' + esc(r[2]) + '</span></div></div></div><span class="gr-r"><span class="fair good">#' + (ROOKIES.indexOf(r) + 1) + '</span></span></button>').join('') : '')) ||
       '<p class="muted small pad">No players match.</p>';
@@ -2138,9 +2244,9 @@ function teamBadge(abbr) {
 function fteamAvatar(t, size) {
   if (!t) return '';
   let h = 0; for (const ch of String(t.name || '')) h = (h * 31 + ch.charCodeAt(0)) % 360;
-  const txt = String(t.abbrev || t.name || '?').slice(0, 4);
+  const txt = String(t.abbrev || t.name || '?').slice(0, size === 'xs' ? 2 : 4);
   const logo = /^https:\/\//.test(t.logo || '') && !BADLOGO.has(t.logo) ? '<img class="av-img" src="' + esc(t.logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
-  return '<span class="av ' + (size || '') + (logo ? ' has-img' : '') + '" style="background:hsl(' + h + ' 55% 34%);--ring:hsl(' + h + ' 65% 62%);' + (txt.length > 3 ? 'font-size:10px' : '') + '" aria-hidden="true">' + esc(txt) + logo + '</span>';
+  return '<span class="av ' + (size || '') + (logo ? ' has-img' : '') + '" style="background:hsl(' + h + ' 55% 34%);--ring:hsl(' + h + ' 65% 62%);' + (txt.length > 3 && size !== 'xs' ? 'font-size:10px' : '') + '" aria-hidden="true">' + esc(txt) + logo + '</span>';
 }
 /* Team pictures uploaded in ESPN. If one can't load (or the page blocks outside images), fall back to initials. */
 const BADLOGO = new Set();
@@ -2521,7 +2627,7 @@ function viewScout() {
       '<div class="pr-main"><div class="pl-main">' + posChip(pos) + '<span class="pl-name">' + esc(name) + '</span></div>' +
       '<div class="pl-meta pr-bio"><span>' + esc(school) + '</span><span>' + esc(ht) + ', ' + wt + ' lbs</span><span>' + esc(cls) + '</span><span class="agechip' + (ag.draft < 21.5 ? ' young' : ag.draft >= 23 ? ' old' : '') + '" title="' + (ag.est ? 'Birth date not published; estimated from class year' : 'Born ' + esc(r[9])) + '">' + (ag.est ? '~' : '') + 'Age ' + ag.now.toFixed(1) + ' · ' + ag.draft.toFixed(1) + ' on draft day' + (ag.est ? ' (est.)' : '') + '</span><span>NFL: ' + esc(nfl) + '</span></div>' +
       '<div class="pr-stats">2026: ' + esc(stats) + '</div><p class="pr-note">' + esc(note) + '</p>' + (() => { const br = boardRanks(name); return br.dyn ? '<div class="small muted">Dynasty boards avg <b class="pos-d">#' + br.dyn.avg.toFixed(1) + '</b>' + (br.nfl ? ' · NFL boards avg <b>#' + br.nfl.avg.toFixed(0) + '</b>' : '') + ' · tap for details</div>' : '<div class="small muted">Tap for details</div>'; })() + '</div>' +
-      '<div class="pr-pick"><span class="pk' + (isMine ? ' mine' : '') + '">' + label + '</span>' + (own ? '<div class="small muted">' + (isMine ? 'Your pick' : esc(own.abbrev || own.name)) + '</div>' : '') +
+      '<div class="pr-pick"><span class="pk' + (isMine ? ' mine' : '') + '">' + label + '</span>' + (own ? '<div class="small muted pr-own">' + fteamAvatar(own, 'xs') + (isMine ? 'Your pick' : esc(own.abbrev || own.name)) + '</div>' : '') +
       (mineBoard ? '<div class="mv"><button class="mvb" data-act="mv" data-name="' + esc(name) + '" data-d="-1" aria-label="Move ' + esc(name) + ' up">▲</button><button class="mvb" data-act="mv" data-name="' + esc(name) + '" data-d="1" aria-label="Move ' + esc(name) + ' down">▼</button></div>' : '') + '</div></article>';
   }).join('');
   const myTargets = myPicks.map(p => {
