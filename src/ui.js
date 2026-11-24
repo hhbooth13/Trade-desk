@@ -191,14 +191,30 @@ function fteamAvatar(t, size) {
   if (!t) return '';
   let h = 0; for (const ch of String(t.name || '')) h = (h * 31 + ch.charCodeAt(0)) % 360;
   const txt = String(t.abbrev || t.name || '?').slice(0, size === 'xs' ? 2 : 4);
-  const logo = /^https:\/\//.test(t.logo || '') && !BADLOGO.has(t.logo) ? '<img class="av-img" src="' + esc(t.logo) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
+  const src = logoSrc(t.logo);
+  const logo = src ? '<img class="av-img" src="' + esc(src) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
   return '<span class="av ' + (size || '') + (logo ? ' has-img' : '') + '" style="background:hsl(' + h + ' 55% 34%);--ring:hsl(' + h + ' 65% 62%);' + (txt.length > 3 && size !== 'xs' ? 'font-size:10px' : '') + '" aria-hidden="true">' + esc(txt) + logo + '</span>';
 }
 /* Team pictures uploaded in ESPN. If one can't load (or the page blocks outside images), fall back to initials. */
-const BADLOGO = new Set();
+/* Some uploaded pictures live on sites that block outside apps or only serve http. Those go through a free
+   public image proxy (images.weserv.nl), which re-serves the same public picture over https. */
+const BADLOGO = new Set(), PROXIED = new Set();
+const proxyUrl = u => 'https://images.weserv.nl/?w=128&h=128&fit=cover&url=' + encodeURIComponent(u.replace(/^https?:\/\//, ''));
+function logoSrc(u) {
+  u = typeof normLogo === 'function' ? normLogo(u) : u;
+  if (!u || BADLOGO.has(u)) return '';
+  if (PROXIED.has(u) || /^http:/i.test(u)) return proxyUrl(u);
+  return u;
+}
 document.addEventListener('error', e => {
   const img = e.target;
-  if (img && img.classList && img.classList.contains('av-img')) { BADLOGO.add(img.getAttribute('src')); const p = img.parentNode; img.remove(); if (p) p.classList.remove('has-img'); }
+  if (!img || !img.classList || !img.classList.contains('av-img')) return;
+  const src = img.getAttribute('src');
+  if (src.startsWith('https://images.weserv.nl/')) {
+    const orig = decodeURIComponent(src.split('&url=')[1] || '');
+    [...PROXIED].forEach(u => { if (u.replace(/^https?:\/\//, '') === orig) BADLOGO.add(u); });
+    const p = img.parentNode; img.remove(); if (p) p.classList.remove('has-img');
+  } else { PROXIED.add(src); img.setAttribute('src', proxyUrl(src)); }
 }, true);
 const INJ_SHORT = { INJURY_RESERVE: 'IR', OUT: 'O', QUESTIONABLE: 'Q', DOUBTFUL: 'D', SUSPENSION: 'SUSP', DAY_TO_DAY: 'DTD' };
 function playerLine(p, opts) {

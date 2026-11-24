@@ -1,4 +1,12 @@
 (async () => {
+/* Team picture URLs: ESPN stores whatever the manager entered, so accept //host/..., bare host/..., and http links. */
+function normLogo(u) {
+  u = String(u || '').trim();
+  if (!u || /^data:|^javascript:/i.test(u)) return '';
+  if (u.startsWith('//')) u = 'https:' + u;
+  else if (!/^https?:\/\//i.test(u)) { if (/^[\w-]+(\.[\w-]+)+\//.test(u)) u = 'https://' + u; else return ''; }
+  return u;
+}
 /* Turn ESPN transaction lists and league-activity messages into one deduped trade list.
    Trades still in the league's review period are kept and marked pending. */
 function tradeKey(items) { return items.map(i => i.join(':')).sort().join(','); }
@@ -119,7 +127,7 @@ function collectTrades(txs, topics) {
       return {
         id: t.id,
         name: t.name || ((t.location || '') + ' ' + (t.nickname || '')).trim() || ('Team ' + t.id),
-        abbrev: t.abbrev || '', logo: /^https?:\/\//.test(t.logo || '') ? t.logo.replace(/^http:/, 'https:') : '',
+        abbrev: t.abbrev || '', logo: normLogo(t.logo),
         owner: (t.owners || []).map(x => mem[x]).filter(Boolean).join(', '),
         mine: !!sw && (t.owners || []).some(x => String(x).toUpperCase() === sw),
         w: o.wins || 0, l: o.losses || 0, t: o.ties || 0, pf: Math.round(o.pointsFor || 0),
