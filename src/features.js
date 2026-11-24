@@ -277,6 +277,7 @@ if (typeof module !== 'undefined' && module.exports) Object.assign(module.export
    Now: this season's lineup using redraft values (injuries and news included).
    Later: each player's dynasty value moved along his position's age curve, plus the draft picks a team
    owns turning into rookies (a pick counts for 55% in its first season, 85% in the next, then 100%). */
+function outlookLater(p, k) { if (!p.age || !PEAK_AGE[p.pos]) return p.value * Math.pow(0.9, k); return p.value * ageFactor(p.pos, p.age + k) / ageFactor(p.pos, p.age); }
 function dynastyOutlook(m) {
   if (m.lg.type !== 'dynasty') return null;
   const season = +m.lg.season || new Date().getFullYear();
@@ -290,7 +291,7 @@ function dynastyOutlook(m) {
     const nr = newsR.get(String(p.espn)); if (typeof nr === 'number') v *= nr;
     return v;
   };
-  const later = (p, k) => { if (!p.age || !PEAK_AGE[p.pos]) return p.value * Math.pow(0.9, k); return p.value * ageFactor(p.pos, p.age + k) / ageFactor(p.pos, p.age); };
+  const later = outlookLater;
   const rows = m.teams.map(t => {
     const sk = t.players.filter(p => SKILL.includes(p.pos) || p.pos === 'K' || p.pos === 'D/ST');
     const scores = WIN.map(w => {
@@ -317,4 +318,50 @@ function dynastyOutlook(m) {
   });
   rows.sort((a, b) => a.ranks[0] - b.ranks[0]);
   return { windows: WIN, rows };
+}
+
+/* ---------- Game plan: the recommended path for a team, from its outlook ---------- */
+function gamePlan(m, o, teamId) {
+  const r = o.rows.find(x => x.team.id === teamId);
+  if (!r) return null;
+  const n = o.rows.length, third = Math.ceil(n / 3), half = Math.ceil(n / 2);
+  const t = r.team, [now, next, far] = r.ranks;
+  /* direction: push now when this season is the team's best shot and it's near the top; otherwise build for later */
+  const dir = r.label === 'Dynasty power' ? 'balanced' : (r.label === 'Win now' || (r.label === 'Fading' && now <= half) || (r.label === 'Middle' && now < far && now <= half)) ? 'contend'
+    : (r.label === 'Rebuilding' || r.label === 'Stuck' || r.label === 'Rising' || r.label === 'Fading' || far < now) ? 'rebuild' : 'contend';
+  const HEAD = {
+    balanced: ['Stay the course', 'You\u2019re strong now and later. Don\u2019t sell the future for a small upgrade; turn extra depth into one better starter.'],
+    contend: ['Go for it this season', now <= third ? 'You\u2019re a top team now. Use picks and young depth to upgrade your weakest starters while your window is open.' : 'You\u2019re close. One or two upgrades at your weak spots could make you a real contender; pay with picks and young bench players.'],
+    rebuild: ['Build for ' + o.windows[2].year, far <= half ? 'Your best years are ahead. Sell veterans who will lose value, and add picks and players 24 and under.' : 'You\u2019re not winning now or later with this roster. Sell anyone past his prime while he still has value and stock up on picks and young players.']
+  };
+  const others = o.rows.filter(x => x.team.id !== t.id);
+  const isBuyer = x => ['Win now', 'Fading', 'Dynasty power', 'Middle'].includes(x.label) && x.ranks[0] <= half + 1;
+  const isSeller = x => ['Rebuilding', 'Stuck', 'Rising'].includes(x.label) || x.ranks[2] < x.ranks[0] - 2;
+  const loss = p => p.value ? 1 - outlookLater(p, 3) / p.value : 0;
+  const skill = t.players.filter(p => SKILL.includes(p.pos) && p.value >= 300);
+  /* sell: players whose value drops most by year 3 (rebuild), or surplus/aging bench pieces (contend) */
+  const startersIds = new Set(lineup(t.players, m.lg.slots).starters.map(x => x.p && x.p.id).filter(Boolean));
+  let sell = dir === 'rebuild' ? skill.filter(p => loss(p) >= 0.2 && (!p.age || p.age > 24)).sort((a, b) => b.value * loss(b) - a.value * loss(a)).slice(0, 5)
+    : skill.filter(p => !startersIds.has(p.id) && (t.surplus.includes(p.pos) || (p.age && p.age <= 24 && dir === 'contend'))).sort((a, b) => b.value - a.value).slice(0, 4);
+  const buyersFor = p => others.filter(x => (dir === 'rebuild' ? isBuyer(x) : true) && x.team.needs.includes(p.pos)).slice(0, 3).map(x => x.team);
+  /* buy: proven starters at your needs from sellers (contend), or young players / picks from buyers (rebuild) */
+  let buy = [];
+  if (dir === 'rebuild') {
+    others.filter(isBuyer).forEach(x => x.team.players.filter(p => SKILL.includes(p.pos) && p.age && p.age <= 24 && p.value >= 1200).forEach(p => buy.push({ p, from: x.team })));
+    buy.sort((a, b) => b.p.value - a.p.value); buy = buy.slice(0, 5);
+  } else {
+    const needs = t.needs.length ? t.needs : SKILL.filter(p => t.rank[p] > third);
+    others.filter(isSeller).forEach(x => x.team.players.filter(p => needs.includes(p.pos) && p.value >= 1500 && (!p.age || p.age >= 25)).forEach(p => buy.push({ p, from: x.team })));
+    buy.sort((a, b) => b.p.value - a.p.value); buy = buy.slice(0, 5);
+  }
+  const picks = (t.picks || []).slice().sort((a, b) => a.year - b.year || a.round - b.round);
+  const pickAdvice = dir === 'rebuild' ? 'Keep your picks' + (picks.length ? ' (' + picks.filter(p => p.round === 1).length + ' firsts)' : '') + ' and ask for more in every veteran trade.'
+    : dir === 'contend' ? (picks.length ? 'Your picks are trade chips. Later-year picks cost you the least today.' : 'You\u2019re out of picks to deal; use young bench players instead.')
+    : 'Hold your firsts unless they bring back a clear upgrade.';
+  const steps = [];
+  if (sell.length) steps.push(dir === 'rebuild' ? 'Sell ' + sell.slice(0, 2).map(p => p.name).join(' and ') + ' before age drops their value.' : 'Package ' + sell.slice(0, 2).map(p => p.name).join(' and ') + ' (bench depth) for one better starter.');
+  if (buy.length) steps.push(dir === 'rebuild' ? 'Target young players like ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team trying to win now.' : 'Target ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team looking to the future.');
+  if (t.needs.length && dir !== 'rebuild') steps.push('Your weakest spot' + (t.needs.length > 1 ? 's are ' : ' is ') + t.needs.join(' and ') + '. Upgrade there first.');
+  steps.push(pickAdvice);
+  return { r, dir, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p) })), buy, picks };
 }

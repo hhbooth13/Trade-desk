@@ -502,10 +502,10 @@ function viewOutlook(m) {
   const arrow = d => d > 1 ? '<span class="pos-d small">▲' + d + '</span>' : d < -1 ? '<span class="neg-d small">▼' + -d + '</span>' : '<span class="muted small">–</span>';
   const tag = l => '<span class="otag" style="--h:' + OUTLOOK_HUE[l] + '" title="' + esc(OUTLOOK_TIP[l]) + '">' + l + '</span>';
   const table = '<div class="card tablewrap"><table class="league outlook"><thead><tr><th>Team</th>' + o.windows.map(w => '<th class="c">' + w.label + '</th>').join('') + '<th class="c hide-sm">Trend</th><th class="c hide-sm">Age</th><th class="c hide-sm">1sts</th></tr></thead><tbody>' +
-    o.rows.map(r => '<tr class="' + (r.team.id === m.lg.myTeamId ? 'me' : '') + '"><td><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<div><button class="link" data-act="openTeam" data-id="' + r.team.id + '">' + teamName(r.team) + '</button><div>' + tag(r.label) + '</div></div></div></td>' +
+    o.rows.map(r => '<tr class="tap' + (r.team.id === m.lg.myTeamId ? ' me' : '') + '" data-act="plan" data-id="' + r.team.id + '" title="Tap for the game plan"><td><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<div><button class="link" data-act="openTeam" data-id="' + r.team.id + '">' + teamName(r.team) + '</button><div>' + tag(r.label) + '</div></div></div></td>' +
       r.ranks.map(x => '<td class="c">' + rk(x, n) + '</td>').join('') + '<td class="c hide-sm">' + arrow(r.trend) + '</td><td class="c num hide-sm">' + (r.age ? r.age.toFixed(1) : '–') + '</td><td class="c num hide-sm">' + r.picks + '</td></tr>').join('') + '</tbody></table></div>';
   const me = o.rows.find(r => r.team.id === m.lg.myTeamId);
-  const mine = me ? '<section class="card"><h3>Your outlook</h3><div class="row" style="margin:0 0 6px">' + tag(me.label) + '<span class="small">' + esc(OUTLOOK_TIP[me.label]) + '</span></div><p class="small" style="margin:0">' + o.windows.map((w, i) => w.label + ': <b>' + ord(me.ranks[i]) + '</b>').join(' · ') + (me.age ? ' · starters average ' + me.age.toFixed(1) + ' years old' : '') + '</p></section>' : '';
+  const mine = me ? '<section class="card"><h3>Your outlook</h3><div class="row" style="margin:0 0 6px">' + tag(me.label) + '<span class="small">' + esc(OUTLOOK_TIP[me.label]) + '</span></div><p class="small" style="margin:0">' + o.windows.map((w, i) => w.label + ': <b>' + ord(me.ranks[i]) + '</b>').join(' · ') + (me.age ? ' · starters average ' + me.age.toFixed(1) + ' years old' : '') + '</p><div class="row"><button class="btn" data-act="plan" data-id="' + me.team.id + '">See your game plan</button></div></section>' : '';
   const sellers = o.rows.filter(r => (r.label === 'Rebuilding' || r.label === 'Stuck' || r.label === 'Rising') && r.team.id !== m.lg.myTeamId && r.sellers.length);
   const buyers = o.rows.filter(r => (r.label === 'Win now' || r.label === 'Fading' || r.label === 'Dynasty power') && r.team.id !== m.lg.myTeamId && r.young.length);
   const chip = p => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + ' <span class="muted">' + p.age.toFixed(0) + '</span> <b>' + fmt(p.value) + '</b></span>';
@@ -513,6 +513,39 @@ function viewOutlook(m) {
     sellers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="grade-got">' + r.sellers.map(chip).join('') + '</div></div>').join('') + '</section>' : '') +
     (buyers.length ? '<section class="card mt"><h3>Teams buying now</h3><p class="muted small">Teams built for this season. They’re the ones to sell your veterans to, and they may give up young players or picks.</p>' +
     buyers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="small muted">Young players they could move: </div><div class="grade-got">' + r.young.map(chip).join('') + '</div></div>').join('') + '</section>' : '');
-  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years age every player along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third.</p>' +
+  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years age every player along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third. Tap any team for its game plan.</p>' +
     mine + table + market;
 }
+
+function openPlan(teamId) {
+  const m = model(), o = dynastyOutlook(m);
+  if (!o) return;
+  const g = gamePlan(m, o, +teamId);
+  if (!g) return;
+  const mine = g.r.team.id === m.lg.myTeamId, t = g.r.team;
+  const tag = l => '<span class="otag" style="--h:' + OUTLOOK_HUE[l] + '">' + l + '</span>';
+  const chip = (p, extra) => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + (p.age ? ' <span class="muted">' + p.age.toFixed(0) + '</span>' : '') + ' <b>' + fmt(p.value) + '</b>' + (extra || '') + '</span>';
+  const sellRows = g.sell.map(x => '<div class="plan-row">' + chip(x.p, x.loss >= 0.15 ? ' <span class="neg-d small">−' + Math.round(x.loss * 100) + '% by ' + o.windows[2].year + '</span>' : '') + (x.buyers.length ? '<span class="small muted">Buyers: ' + x.buyers.map(b => esc(b.abbrev || b.name)).join(', ') + '</span>' : '') + '</div>').join('');
+  const buyRows = g.buy.map(x => '<div class="plan-row">' + chip(x.p) + '<span class="small muted">from ' + fteamAvatar(x.from, 'xs') + ' ' + esc(x.from.abbrev || x.from.name) + '</span></div>').join('');
+  const d = $('#modal');
+  d.innerHTML = '<div class="modal-card sheet wide" role="dialog" aria-modal="true" aria-labelledby="gph"><div class="sheet-head">' + fteamAvatar(t, 'lg') + '<div><div class="small muted">' + (mine ? 'Your game plan' : 'Their likely game plan') + '</div><h3 id="gph" class="plan-h">' + esc(g.head) + '</h3><div>' + tag(g.r.label) + ' <span class="small muted">' + o.windows.map((w, i) => w.label + ' ' + ord(g.r.ranks[i])).join(' · ') + '</span></div></div><button class="x sheet-x" id="pClose" aria-label="Close">×</button></div>' +
+    '<p>' + esc(mine ? g.why : g.why.replace(/You’re/g, 'They’re').replace(/\bYour\b/g, 'Their').replace(/\byour\b/g, 'their').replace(/\bYou\b/g, 'They').replace(/\byou\b/g, 'them')) + '</p>' +
+    (mine ? '<h3 class="mt">Next steps</h3><ol class="plan-steps">' + g.steps.map(s => '<li>' + esc(s) + '</li>').join('') + '</ol>' : '<h3 class="mt">How to deal with them</h3><p class="small">' + (g.dir === 'rebuild' ? 'They should sell veterans for picks and young players. Offer youth or picks for the players below.' : 'They’re buying. Offer them proven starters at ' + (t.needs.join(' or ') || 'any position') + '; ask for picks or young players back.') + '</p>') +
+    (g.sell.length ? '<h3 class="mt">' + (mine ? (g.dir === 'rebuild' ? 'Sell before they lose value' : 'Trade chips') : (g.dir === 'rebuild' ? 'Players they should sell' : 'Players they could spare')) + '</h3>' + sellRows : '') +
+    (g.buy.length && mine ? '<h3 class="mt">' + (g.dir === 'rebuild' ? 'Young players to target' : 'Starters to target') + '</h3>' + buyRows : '') +
+    (mine ? '<div class="row mt"><button class="btn" data-act="planIdeas" data-dir="' + g.dir + '">Find trades for this plan</button>' + (g.sell.length ? '<button class="btn ghost" data-act="planBlock">Put sell list on trade block</button>' : '') + '</div><p class="small muted" id="planMsg"></p>' :
+      '<div class="row mt"><button class="btn" data-act="planTrade" data-id="' + t.id + '">See trade ideas with them</button></div>') + '</div>';
+  d.hidden = false;
+  ui._plan = g;
+  const close = () => { d.hidden = true; };
+  $('#pClose').onclick = close; d.onclick = e => { if (e.target === d) close(); };
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const a = el.dataset.act;
+  if (a === 'plan') openPlan(el.dataset.id);
+  else if (a === 'planIdeas') { const lg = S.leagues[S.active]; lg.mode = el.dataset.dir === 'rebuild' ? 'rebuild' : el.dataset.dir === 'contend' ? 'contend' : null; save([lg.id]); $('#modal').hidden = true; go('ideas'); }
+  else if (a === 'planBlock') { const lg = S.leagues[S.active], b = blockOf(lg); (ui._plan ? ui._plan.sell : []).forEach(x => { if (!b.sell.includes(x.p.id)) b.sell.push(x.p.id); }); save([lg.id]); const msg = $('#planMsg'); if (msg) msg.textContent = 'Added to your trade block. Trade ideas will try to move them.'; }
+  else if (a === 'planTrade') { ui.ideaTeam = el.dataset.id; $('#modal').hidden = true; go('ideas'); }
+});

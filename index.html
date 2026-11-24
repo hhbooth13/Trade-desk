@@ -484,6 +484,11 @@ tr.me td { background: rgba(56, 200, 245, .08); }
 .av.jersey { background: none; box-shadow: none; border-radius: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); }
 .av.jersey svg { display: block; overflow: visible; }
 .av.fa { background: rgba(48, 60, 86, .8); color: var(--muted); font: 700 11px var(--display); box-shadow: inset 0 0 0 1.5px var(--line-hi); }
+.outlook tr.tap { cursor: pointer; } .outlook tr.tap:hover td { background: rgba(56, 200, 245, .06); }
+.plan-h { font-size: 20px; text-transform: none; letter-spacing: -.01em; color: var(--ink); margin: 2px 0 4px; }
+.plan-h::before { display: none; }
+.plan-steps { margin: 6px 0 0; padding-left: 20px; } .plan-steps li { margin: 6px 0; }
+.plan-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
 .otag { display: inline-block; margin-top: 3px; font: 700 10px var(--display); letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; color: hsl(var(--h) 85% 68%); background: hsl(var(--h) 80% 55% / .14); box-shadow: inset 0 0 0 1px hsl(var(--h) 80% 60% / .35); white-space: nowrap; cursor: help; }
 .outlook td.c, .outlook th.c { text-align: center; }
 .mkt { padding: 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
@@ -1506,6 +1511,7 @@ if (typeof module !== 'undefined' && module.exports) Object.assign(module.export
    Now: this season's lineup using redraft values (injuries and news included).
    Later: each player's dynasty value moved along his position's age curve, plus the draft picks a team
    owns turning into rookies (a pick counts for 55% in its first season, 85% in the next, then 100%). */
+function outlookLater(p, k) { if (!p.age || !PEAK_AGE[p.pos]) return p.value * Math.pow(0.9, k); return p.value * ageFactor(p.pos, p.age + k) / ageFactor(p.pos, p.age); }
 function dynastyOutlook(m) {
   if (m.lg.type !== 'dynasty') return null;
   const season = +m.lg.season || new Date().getFullYear();
@@ -1519,7 +1525,7 @@ function dynastyOutlook(m) {
     const nr = newsR.get(String(p.espn)); if (typeof nr === 'number') v *= nr;
     return v;
   };
-  const later = (p, k) => { if (!p.age || !PEAK_AGE[p.pos]) return p.value * Math.pow(0.9, k); return p.value * ageFactor(p.pos, p.age + k) / ageFactor(p.pos, p.age); };
+  const later = outlookLater;
   const rows = m.teams.map(t => {
     const sk = t.players.filter(p => SKILL.includes(p.pos) || p.pos === 'K' || p.pos === 'D/ST');
     const scores = WIN.map(w => {
@@ -1546,6 +1552,52 @@ function dynastyOutlook(m) {
   });
   rows.sort((a, b) => a.ranks[0] - b.ranks[0]);
   return { windows: WIN, rows };
+}
+
+/* ---------- Game plan: the recommended path for a team, from its outlook ---------- */
+function gamePlan(m, o, teamId) {
+  const r = o.rows.find(x => x.team.id === teamId);
+  if (!r) return null;
+  const n = o.rows.length, third = Math.ceil(n / 3), half = Math.ceil(n / 2);
+  const t = r.team, [now, next, far] = r.ranks;
+  /* direction: push now when this season is the team's best shot and it's near the top; otherwise build for later */
+  const dir = r.label === 'Dynasty power' ? 'balanced' : (r.label === 'Win now' || (r.label === 'Fading' && now <= half) || (r.label === 'Middle' && now < far && now <= half)) ? 'contend'
+    : (r.label === 'Rebuilding' || r.label === 'Stuck' || r.label === 'Rising' || r.label === 'Fading' || far < now) ? 'rebuild' : 'contend';
+  const HEAD = {
+    balanced: ['Stay the course', 'You\u2019re strong now and later. Don\u2019t sell the future for a small upgrade; turn extra depth into one better starter.'],
+    contend: ['Go for it this season', now <= third ? 'You\u2019re a top team now. Use picks and young depth to upgrade your weakest starters while your window is open.' : 'You\u2019re close. One or two upgrades at your weak spots could make you a real contender; pay with picks and young bench players.'],
+    rebuild: ['Build for ' + o.windows[2].year, far <= half ? 'Your best years are ahead. Sell veterans who will lose value, and add picks and players 24 and under.' : 'You\u2019re not winning now or later with this roster. Sell anyone past his prime while he still has value and stock up on picks and young players.']
+  };
+  const others = o.rows.filter(x => x.team.id !== t.id);
+  const isBuyer = x => ['Win now', 'Fading', 'Dynasty power', 'Middle'].includes(x.label) && x.ranks[0] <= half + 1;
+  const isSeller = x => ['Rebuilding', 'Stuck', 'Rising'].includes(x.label) || x.ranks[2] < x.ranks[0] - 2;
+  const loss = p => p.value ? 1 - outlookLater(p, 3) / p.value : 0;
+  const skill = t.players.filter(p => SKILL.includes(p.pos) && p.value >= 300);
+  /* sell: players whose value drops most by year 3 (rebuild), or surplus/aging bench pieces (contend) */
+  const startersIds = new Set(lineup(t.players, m.lg.slots).starters.map(x => x.p && x.p.id).filter(Boolean));
+  let sell = dir === 'rebuild' ? skill.filter(p => loss(p) >= 0.2 && (!p.age || p.age > 24)).sort((a, b) => b.value * loss(b) - a.value * loss(a)).slice(0, 5)
+    : skill.filter(p => !startersIds.has(p.id) && (t.surplus.includes(p.pos) || (p.age && p.age <= 24 && dir === 'contend'))).sort((a, b) => b.value - a.value).slice(0, 4);
+  const buyersFor = p => others.filter(x => (dir === 'rebuild' ? isBuyer(x) : true) && x.team.needs.includes(p.pos)).slice(0, 3).map(x => x.team);
+  /* buy: proven starters at your needs from sellers (contend), or young players / picks from buyers (rebuild) */
+  let buy = [];
+  if (dir === 'rebuild') {
+    others.filter(isBuyer).forEach(x => x.team.players.filter(p => SKILL.includes(p.pos) && p.age && p.age <= 24 && p.value >= 1200).forEach(p => buy.push({ p, from: x.team })));
+    buy.sort((a, b) => b.p.value - a.p.value); buy = buy.slice(0, 5);
+  } else {
+    const needs = t.needs.length ? t.needs : SKILL.filter(p => t.rank[p] > third);
+    others.filter(isSeller).forEach(x => x.team.players.filter(p => needs.includes(p.pos) && p.value >= 1500 && (!p.age || p.age >= 25)).forEach(p => buy.push({ p, from: x.team })));
+    buy.sort((a, b) => b.p.value - a.p.value); buy = buy.slice(0, 5);
+  }
+  const picks = (t.picks || []).slice().sort((a, b) => a.year - b.year || a.round - b.round);
+  const pickAdvice = dir === 'rebuild' ? 'Keep your picks' + (picks.length ? ' (' + picks.filter(p => p.round === 1).length + ' firsts)' : '') + ' and ask for more in every veteran trade.'
+    : dir === 'contend' ? (picks.length ? 'Your picks are trade chips. Later-year picks cost you the least today.' : 'You\u2019re out of picks to deal; use young bench players instead.')
+    : 'Hold your firsts unless they bring back a clear upgrade.';
+  const steps = [];
+  if (sell.length) steps.push(dir === 'rebuild' ? 'Sell ' + sell.slice(0, 2).map(p => p.name).join(' and ') + ' before age drops their value.' : 'Package ' + sell.slice(0, 2).map(p => p.name).join(' and ') + ' (bench depth) for one better starter.');
+  if (buy.length) steps.push(dir === 'rebuild' ? 'Target young players like ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team trying to win now.' : 'Target ' + buy[0].p.name + ' from ' + (buy[0].from.abbrev || buy[0].from.name) + ', a team looking to the future.');
+  if (t.needs.length && dir !== 'rebuild') steps.push('Your weakest spot' + (t.needs.length > 1 ? 's are ' : ' is ') + t.needs.join(' and ') + '. Upgrade there first.');
+  steps.push(pickAdvice);
+  return { r, dir, head: HEAD[dir][0], why: HEAD[dir][1], steps, sell: sell.map(p => ({ p, loss: loss(p), buyers: buyersFor(p) })), buy, picks };
 }
 
 /* ---------- 2027 rookie board (1QB dynasty), as of Nov 23, 2026 ----------
@@ -2338,10 +2390,10 @@ function viewOutlook(m) {
   const arrow = d => d > 1 ? '<span class="pos-d small">▲' + d + '</span>' : d < -1 ? '<span class="neg-d small">▼' + -d + '</span>' : '<span class="muted small">–</span>';
   const tag = l => '<span class="otag" style="--h:' + OUTLOOK_HUE[l] + '" title="' + esc(OUTLOOK_TIP[l]) + '">' + l + '</span>';
   const table = '<div class="card tablewrap"><table class="league outlook"><thead><tr><th>Team</th>' + o.windows.map(w => '<th class="c">' + w.label + '</th>').join('') + '<th class="c hide-sm">Trend</th><th class="c hide-sm">Age</th><th class="c hide-sm">1sts</th></tr></thead><tbody>' +
-    o.rows.map(r => '<tr class="' + (r.team.id === m.lg.myTeamId ? 'me' : '') + '"><td><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<div><button class="link" data-act="openTeam" data-id="' + r.team.id + '">' + teamName(r.team) + '</button><div>' + tag(r.label) + '</div></div></div></td>' +
+    o.rows.map(r => '<tr class="tap' + (r.team.id === m.lg.myTeamId ? ' me' : '') + '" data-act="plan" data-id="' + r.team.id + '" title="Tap for the game plan"><td><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<div><button class="link" data-act="openTeam" data-id="' + r.team.id + '">' + teamName(r.team) + '</button><div>' + tag(r.label) + '</div></div></div></td>' +
       r.ranks.map(x => '<td class="c">' + rk(x, n) + '</td>').join('') + '<td class="c hide-sm">' + arrow(r.trend) + '</td><td class="c num hide-sm">' + (r.age ? r.age.toFixed(1) : '–') + '</td><td class="c num hide-sm">' + r.picks + '</td></tr>').join('') + '</tbody></table></div>';
   const me = o.rows.find(r => r.team.id === m.lg.myTeamId);
-  const mine = me ? '<section class="card"><h3>Your outlook</h3><div class="row" style="margin:0 0 6px">' + tag(me.label) + '<span class="small">' + esc(OUTLOOK_TIP[me.label]) + '</span></div><p class="small" style="margin:0">' + o.windows.map((w, i) => w.label + ': <b>' + ord(me.ranks[i]) + '</b>').join(' · ') + (me.age ? ' · starters average ' + me.age.toFixed(1) + ' years old' : '') + '</p></section>' : '';
+  const mine = me ? '<section class="card"><h3>Your outlook</h3><div class="row" style="margin:0 0 6px">' + tag(me.label) + '<span class="small">' + esc(OUTLOOK_TIP[me.label]) + '</span></div><p class="small" style="margin:0">' + o.windows.map((w, i) => w.label + ': <b>' + ord(me.ranks[i]) + '</b>').join(' · ') + (me.age ? ' · starters average ' + me.age.toFixed(1) + ' years old' : '') + '</p><div class="row"><button class="btn" data-act="plan" data-id="' + me.team.id + '">See your game plan</button></div></section>' : '';
   const sellers = o.rows.filter(r => (r.label === 'Rebuilding' || r.label === 'Stuck' || r.label === 'Rising') && r.team.id !== m.lg.myTeamId && r.sellers.length);
   const buyers = o.rows.filter(r => (r.label === 'Win now' || r.label === 'Fading' || r.label === 'Dynasty power') && r.team.id !== m.lg.myTeamId && r.young.length);
   const chip = p => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + ' <span class="muted">' + p.age.toFixed(0) + '</span> <b>' + fmt(p.value) + '</b></span>';
@@ -2349,9 +2401,42 @@ function viewOutlook(m) {
     sellers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="grade-got">' + r.sellers.map(chip).join('') + '</div></div>').join('') + '</section>' : '') +
     (buyers.length ? '<section class="card mt"><h3>Teams buying now</h3><p class="muted small">Teams built for this season. They’re the ones to sell your veterans to, and they may give up young players or picks.</p>' +
     buyers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="small muted">Young players they could move: </div><div class="grade-got">' + r.young.map(chip).join('') + '</div></div>').join('') + '</section>' : '');
-  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years age every player along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third.</p>' +
+  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years age every player along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third. Tap any team for its game plan.</p>' +
     mine + table + market;
 }
+
+function openPlan(teamId) {
+  const m = model(), o = dynastyOutlook(m);
+  if (!o) return;
+  const g = gamePlan(m, o, +teamId);
+  if (!g) return;
+  const mine = g.r.team.id === m.lg.myTeamId, t = g.r.team;
+  const tag = l => '<span class="otag" style="--h:' + OUTLOOK_HUE[l] + '">' + l + '</span>';
+  const chip = (p, extra) => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + (p.age ? ' <span class="muted">' + p.age.toFixed(0) + '</span>' : '') + ' <b>' + fmt(p.value) + '</b>' + (extra || '') + '</span>';
+  const sellRows = g.sell.map(x => '<div class="plan-row">' + chip(x.p, x.loss >= 0.15 ? ' <span class="neg-d small">−' + Math.round(x.loss * 100) + '% by ' + o.windows[2].year + '</span>' : '') + (x.buyers.length ? '<span class="small muted">Buyers: ' + x.buyers.map(b => esc(b.abbrev || b.name)).join(', ') + '</span>' : '') + '</div>').join('');
+  const buyRows = g.buy.map(x => '<div class="plan-row">' + chip(x.p) + '<span class="small muted">from ' + fteamAvatar(x.from, 'xs') + ' ' + esc(x.from.abbrev || x.from.name) + '</span></div>').join('');
+  const d = $('#modal');
+  d.innerHTML = '<div class="modal-card sheet wide" role="dialog" aria-modal="true" aria-labelledby="gph"><div class="sheet-head">' + fteamAvatar(t, 'lg') + '<div><div class="small muted">' + (mine ? 'Your game plan' : 'Their likely game plan') + '</div><h3 id="gph" class="plan-h">' + esc(g.head) + '</h3><div>' + tag(g.r.label) + ' <span class="small muted">' + o.windows.map((w, i) => w.label + ' ' + ord(g.r.ranks[i])).join(' · ') + '</span></div></div><button class="x sheet-x" id="pClose" aria-label="Close">×</button></div>' +
+    '<p>' + esc(mine ? g.why : g.why.replace(/You’re/g, 'They’re').replace(/\bYour\b/g, 'Their').replace(/\byour\b/g, 'their').replace(/\bYou\b/g, 'They').replace(/\byou\b/g, 'them')) + '</p>' +
+    (mine ? '<h3 class="mt">Next steps</h3><ol class="plan-steps">' + g.steps.map(s => '<li>' + esc(s) + '</li>').join('') + '</ol>' : '<h3 class="mt">How to deal with them</h3><p class="small">' + (g.dir === 'rebuild' ? 'They should sell veterans for picks and young players. Offer youth or picks for the players below.' : 'They’re buying. Offer them proven starters at ' + (t.needs.join(' or ') || 'any position') + '; ask for picks or young players back.') + '</p>') +
+    (g.sell.length ? '<h3 class="mt">' + (mine ? (g.dir === 'rebuild' ? 'Sell before they lose value' : 'Trade chips') : (g.dir === 'rebuild' ? 'Players they should sell' : 'Players they could spare')) + '</h3>' + sellRows : '') +
+    (g.buy.length && mine ? '<h3 class="mt">' + (g.dir === 'rebuild' ? 'Young players to target' : 'Starters to target') + '</h3>' + buyRows : '') +
+    (mine ? '<div class="row mt"><button class="btn" data-act="planIdeas" data-dir="' + g.dir + '">Find trades for this plan</button>' + (g.sell.length ? '<button class="btn ghost" data-act="planBlock">Put sell list on trade block</button>' : '') + '</div><p class="small muted" id="planMsg"></p>' :
+      '<div class="row mt"><button class="btn" data-act="planTrade" data-id="' + t.id + '">See trade ideas with them</button></div>') + '</div>';
+  d.hidden = false;
+  ui._plan = g;
+  const close = () => { d.hidden = true; };
+  $('#pClose').onclick = close; d.onclick = e => { if (e.target === d) close(); };
+}
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const a = el.dataset.act;
+  if (a === 'plan') openPlan(el.dataset.id);
+  else if (a === 'planIdeas') { const lg = S.leagues[S.active]; lg.mode = el.dataset.dir === 'rebuild' ? 'rebuild' : el.dataset.dir === 'contend' ? 'contend' : null; save([lg.id]); $('#modal').hidden = true; go('ideas'); }
+  else if (a === 'planBlock') { const lg = S.leagues[S.active], b = blockOf(lg); (ui._plan ? ui._plan.sell : []).forEach(x => { if (!b.sell.includes(x.p.id)) b.sell.push(x.p.id); }); save([lg.id]); const msg = $('#planMsg'); if (msg) msg.textContent = 'Added to your trade block. Trade ideas will try to move them.'; }
+  else if (a === 'planTrade') { ui.ideaTeam = el.dataset.id; $('#modal').hidden = true; go('ideas'); }
+});
 
 /* ---------- App UI ---------- */
 const SEED_ASOF = '2026-11-23T12:00:00';
