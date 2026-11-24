@@ -126,7 +126,7 @@ function importText(txt) {
     let prevSnap = prev.prev || null;
     try { if (prev.teams) prevSnap = rosterSnapshot(prev, modelFor(prev)); } catch (e) {}
     const keep = {};
-    ['pickOwners', 'valueOverrides', 'pickRounds', 'mode', 'block', 'rivals', 'history'].forEach(k => { if (prev[k] != null) keep[k] = prev[k]; });
+    ['pickOwners', 'valueOverrides', 'pickRounds', 'mode', 'block', 'rivals', 'history', 'manualTrades'].forEach(k => { if (prev[k] != null) keep[k] = prev[k]; });
     S.leagues[L.id] = Object.assign({}, L, keep, {
       type: prev.type || (guessDyn ? 'dynasty' : 'redraft'),
       myTeamId: prev.myTeamId != null ? prev.myTeamId : (mineT ? mineT.id : null),

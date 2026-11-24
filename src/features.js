@@ -2,6 +2,10 @@
 
 /* Value of a traded player today, whether or not he's still on a roster. */
 function assetNow(m, pid) {
+  if (typeof pid === 'string' && !/^\d+$/.test(pid)) {
+    const k = m.picks.find(x => x.id === pid) || m.vs.byId.get(pid) || m.players.get(pid);
+    return k || { id: pid, name: pid, pos: '?', value: 0, team: '' };
+  }
   const p = m.players.get('e' + pid);
   if (p) return p;
   const x = m.vs.byEspn.get(String(pid));
@@ -10,7 +14,9 @@ function assetNow(m, pid) {
 }
 
 function tradeGrades(m) {
-  const trades = Array.isArray(m.lg.trades) ? m.lg.trades : [];
+  const synced = Array.isArray(m.lg.trades) ? m.lg.trades : [];
+  const manual = (Array.isArray(m.lg.manualTrades) ? m.lg.manualTrades : []).filter(x => !synced.some(s => tradeKey(s.items) === tradeKey(x.items)));
+  const trades = synced.concat(manual);
   return trades.slice().sort((a, b) => (b.d || 0) - (a.d || 0)).map(x => {
     const sides = {};
     x.items.forEach(([pid, from, to]) => { (sides[to] = sides[to] || { got: [] }).got.push(assetNow(m, pid)); sides[from] = sides[from] || { got: [] }; });
@@ -20,7 +26,7 @@ function tradeGrades(m) {
     const top = rows[0], second = rows[1] || { v: 0 };
     const margin = top.v ? (top.v - second.v) / top.v : 0;
     const grade = margin < 0.07 ? 'Even' : margin < 0.2 ? 'Edge' : 'Win';
-    return { d: x.d, rows, winner: margin < 0.07 ? null : top.team, margin, grade };
+    return { d: x.d, rows, winner: margin < 0.07 ? null : top.team, margin, grade, manual: x.manual || null, pending: !!x.pending };
   });
 }
 

@@ -18,6 +18,36 @@ async function fcValues(qbs, n, ppr) {
   if (!d) d = await one(true, 12);
   return r ? { asOf: Date.now(), qbs, teams: t, ppr, redraft: r, dynasty: d } : null;
 }
+/* Turn ESPN transaction lists and league-activity messages into one deduped trade list.
+   Trades still in the league's review period are kept and marked pending. */
+function tradeKey(items) { return items.map(i => i.join(':')).sort().join(','); }
+function collectTrades(txs, topics) {
+  const out = [], seen = new Set();
+  const add = (d, items, pending) => {
+    if (!items.length) return;
+    const k = tradeKey(items);
+    const prev = out.find(x => x.k === k);
+    if (prev) { if (!pending) prev.pending = false; return; }
+    out.push({ k, d, items, pending: !!pending });
+  };
+  (txs || []).forEach(t => {
+    if (!/TRADE_(ACCEPT|UPHOLD|PROPOSAL)/.test(t.type || '') && t.type !== 'TRADE') return;
+    const st = t.status || 'EXECUTED';
+    if (/CANCEL|REJECT|VETO|FAIL|DECLINE/.test(st)) return;
+    if (t.type === 'TRADE_PROPOSAL' && st !== 'EXECUTED' && st !== 'PENDING' && st !== 'ACCEPTED') return;
+    if (t.type === 'TRADE_PROPOSAL' && st === 'PENDING') return;
+    const items = (t.items || []).filter(i => i.type === 'TRADE' || (i.fromTeamId > 0 && i.toTeamId > 0)).map(i => [i.playerId, i.fromTeamId, i.toTeamId]);
+    add(t.processDate || t.proposedDate || 0, items, st !== 'EXECUTED');
+  });
+  (topics || []).forEach(tp => {
+    const ms = (tp.messages || []).filter(x => x.messageTypeId === 244 && x.targetId);
+    if (!ms.length) return;
+    const froms = [...new Set(ms.map(x => x.from).filter(x => x > 0))];
+    const items = ms.map(x => [x.targetId, x.from, x.to > 0 ? x.to : (froms.length === 2 ? froms.find(f => f !== x.from) : 0)]).filter(i => i[1] > 0 && i[2] > 0);
+    add(tp.date || (ms[0] && ms[0].date) || 0, items, false);
+  });
+  return out.map(x => ({ d: x.d, items: x.items, pending: x.pending || undefined }));
+}
 async function espnSync(id, progress) {
   progress = progress || (() => {});
   const now = new Date();
@@ -82,20 +112,17 @@ async function espnSync(id, progress) {
   } catch (e) {}
   progress('Loading trade history…');
   try {
-    const seen = new Set();
     const weeks = [];
-    for (let w = 1; w <= (L.scoringPeriodId || 1); w++) weeks.push(w);
-    await Promise.all(weeks.map(async w => {
-      const tr = await fetch(base + '?view=mTransactions2&scoringPeriodId=' + w);
-      if (!tr.ok) return;
-      ((await tr.json()).transactions || []).forEach(t => {
-        if (seen.has(t.id) || !/TRADE/.test(t.type || '') || (t.status && t.status !== 'EXECUTED')) return;
-        const items = (t.items || []).filter(i => i.type === 'TRADE' || (i.fromTeamId > 0 && i.toTeamId > 0));
-        if (!items.length) return;
-        seen.add(t.id);
-        trades.push({ d: t.processDate || t.proposedDate || 0, items: items.map(i => [i.playerId, i.fromTeamId, i.toTeamId]) });
-      });
-    }));
+    for (let w = 1; w <= (L.scoringPeriodId || 1) + 1; w++) weeks.push(w);
+    const txs = [].concat(...await Promise.all(weeks.map(async w => {
+      try { const tr = await fetch(base + '?view=mTransactions2&scoringPeriodId=' + w); return tr.ok ? ((await tr.json()).transactions || []) : []; } catch (e) { return []; }
+    })));
+    let topics = [];
+    try {
+      const cr = await fetch(base + '/communication/?view=kona_league_communication', { headers: { 'x-fantasy-filter': '{"topics":{"filterType":{"value":["ACTIVITY_TRANSACTIONS"]},"limit":250,"limitPerMessageSet":{"value":50},"offset":0,"sortMessageDate":{"sortPriority":1,"sortAsc":false},"sortFor":{"sortPriority":2,"sortAsc":false},"filterIncludeMessageTypeIds":{"value":[244]}}}' } });
+      if (cr.ok) topics = (await cr.json()).topics || [];
+    } catch (e) {}
+    collectTrades(txs, topics).forEach(t => trades.push(t));
   } catch (e) {}
   const qbs = (slots['7'] || 0) > 0 ? 2 : 1;
   progress('Loading FantasyCalc values…');

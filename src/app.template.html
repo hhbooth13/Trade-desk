@@ -63,6 +63,7 @@ textarea { width: 100%; font-family: var(--mono); font-size: 12px; resize: verti
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
 .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 14px; align-items: start; }
 .btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 9px 18px; font-weight: 700; cursor: pointer; }
+.btn.sm { padding: 5px 10px; font-size: 12px; }
 .btn.ghost { background: var(--surface2); color: var(--ink); border: 1px solid var(--line); }
 .btn.ghost:hover { border-color: var(--accent); }
 .btn.danger { background: var(--bad); color: #fff; }
@@ -96,6 +97,10 @@ textarea { width: 100%; font-family: var(--mono); font-size: 12px; resize: verti
 .estb { font-size: 11px; font-weight: 700; color: var(--mid); background: var(--mid-soft); padding: 0 6px; border-radius: 999px; cursor: help; }
 .av.has-img { position: relative; overflow: hidden; }
 .av-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--surface2); border-radius: inherit; }
+.tf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+@media (max-width: 560px) { .tf-grid { grid-template-columns: 1fr; } }
+.tf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; min-height: 26px; }
+.tf-res { margin-top: 4px; max-height: 220px; overflow-y: auto; }
 .modal-card.wide { max-width: 560px; }
 .search-sheet { min-height: 60vh; }
 .gres { margin-top: 10px; display: flex; flex-direction: column; }

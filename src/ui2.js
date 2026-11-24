@@ -32,11 +32,73 @@ function counterCard(m, A, B, tA, tB) {
 
 function gradesCard(m) {
   const gs = tradeGrades(m);
-  if (!gs.length) return '<section class="card mt"><h3>Trade grades</h3><p class="muted small">' + (m.lg.trades ? 'No trades in your league yet this season.' : (PWA ? 'Tap the sync button up top to load your league\u2019s trades.' : 'Trade history comes with the updated sync bookmark. Reinstall it from the Sync tab and sync again.')) + '</p></section>';
-  return '<section class="card mt"><h3>Trade grades</h3><p class="muted small">Every trade this season, judged by what each side’s haul is worth today.</p>' +
-    gs.map(g => '<div class="grade"><div class="grade-top"><span class="fair ' + (g.grade === 'Even' ? 'good' : 'mid') + '">' + (g.grade === 'Even' ? 'Even trade' : (g.grade === 'Win' ? 'Clear win: ' : 'Slight edge: ') + esc(g.winner ? g.winner.name : '')) + '</span><span class="small muted">' + (g.d ? when(g.d) : '') + '</span></div>' +
+  const add = '<button class="btn sm ghost" data-act="tradeAdd">+ Add a trade</button>';
+  const head = '<div class="row" style="justify-content:space-between;margin:0 0 6px"><h3 style="margin:0">Trade grades</h3>' + add + '</div>';
+  if (!gs.length) return '<section class="card mt">' + head + '<p class="muted small">' + (m.lg.trades ? 'No trades found from ESPN yet. If your league has made trades, add them with the button above.' : resyncTip()) + '</p></section>';
+  return '<section class="card mt">' + head + '<p class="muted small">Every trade this season, judged by what each side’s haul is worth today. Missing one? Add it above.</p>' +
+    gs.map(g => '<div class="grade"><div class="grade-top"><span class="fair ' + (g.grade === 'Even' ? 'good' : 'mid') + '">' + (g.grade === 'Even' ? 'Even trade' : (g.grade === 'Win' ? 'Clear win: ' : 'Slight edge: ') + esc(g.winner ? g.winner.name : '')) + '</span>' +
+      '<span class="small muted">' + (g.pending ? '<span class="estb">in review</span> ' : '') + (g.manual ? 'added by you · ' : '') + (g.d ? when(g.d) : '') + (g.manual ? ' <button class="link small" data-act="tradeDel" data-id="' + esc(g.manual) + '">Remove</button>' : '') + '</span></div>' +
       g.rows.map(r => '<div class="grade-side"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b><span class="muted small">got</span></div><div class="grade-got">' + r.got.map(p => '<span class="gchip" data-act="player" data-id="' + esc(p.id) + '">' + esc(p.name) + ' <b>' + fmt(p.value) + '</b></span>').join('') + '</div><div class="num">' + fmt(r.v) + '</div></div>').join('') + '</div>').join('') + '</section>';
 }
+
+/* ---------- Add a trade by hand (for trades the ESPN sync misses, or pick trades) ---------- */
+function openTradeForm() {
+  const m = model(), lg = S.leagues[S.active];
+  if (!m) return;
+  const st = { a: m.lg.myTeamId || m.teams[0].id, b: (m.teams.find(t => t.id !== (m.lg.myTeamId || m.teams[0].id)) || {}).id, ga: [], gb: [] };
+  const d = $('#modal');
+  const opts = sel => m.teams.map(t => '<option value="' + t.id + '"' + (t.id === sel ? ' selected' : '') + '>' + esc(t.name) + '</option>').join('');
+  const today = new Date().toISOString().slice(0, 10);
+  const side = k => '<div class="tf-side"><label class="small muted">Team</label><select id="tf' + k + '" style="width:100%">' + opts(st[k]) + '</select>' +
+    '<label class="small muted" style="margin-top:8px;display:block">Got</label><div class="tf-chips" id="tfc' + k + '"></div>' +
+    '<input id="tfq' + k + '" type="search" autocomplete="off" placeholder="Add a player' + (m.lg.type === 'dynasty' ? ' or pick' : '') + '" style="width:100%"><div class="gres tf-res" id="tfr' + k + '"></div></div>';
+  d.innerHTML = '<div class="modal-card sheet wide" role="dialog" aria-modal="true" aria-labelledby="tfh"><div class="sheet-head"><div><h3 id="tfh">Add a trade</h3><div class="small muted">For trades the ESPN sync missed. Pick the two teams and what each one received.</div></div><button class="x sheet-x" id="pClose" aria-label="Close">×</button></div>' +
+    '<div class="tf-grid">' + side('a') + side('b') + '</div>' +
+    '<div class="row"><label class="small muted">Date <input id="tfd" type="date" value="' + today + '"></label><span style="flex:1"></span><button class="btn" id="tfSave">Save trade</button></div><p class="small" id="tfMsg"></p></div>';
+  d.hidden = false;
+  const close = () => { d.hidden = true; };
+  $('#pClose').onclick = close;
+  d.onclick = e => { if (e.target === d) close(); };
+  const pool = () => {
+    const { out } = searchPool(m);
+    return out.concat(m.picks || []);
+  };
+  const keyOf = p => p.pos === 'PICK' ? p.id : p.espn && /^\d+$/.test(p.espn) ? +p.espn : /^e\d+$/.test(p.id) ? +p.id.slice(1) : p.id;
+  const chips = k => { $('#tfc' + k).innerHTML = st['g' + k].map((p, i) => '<span class="gchip">' + esc(p.name) + ' <b>' + fmt(p.value) + '</b> <button class="link" data-tfrm="' + k + i + '" aria-label="Remove ' + esc(p.name) + '">×</button></span>').join('') || '<span class="muted small">Nothing yet</span>'; };
+  const search = k => {
+    const q = nk($('#tfq' + k).value), box = $('#tfr' + k);
+    if (!q) { box.innerHTML = ''; return; }
+    const taken = new Set(st.ga.concat(st.gb).map(p => p.id));
+    const hits = pool().filter(p => !taken.has(p.id) && nk(p.name + ' ' + (p.alias || '')).includes(q));
+    if (ALLPLAYERS && hits.length < 8) ALLPLAYERS.players.forEach(r => { if (hits.length < 8 && !taken.has('e' + r[0]) && !hits.some(h => h.id === 'e' + r[0]) && nk(r[1]).includes(q)) { const p = globalPlayer(m, r[0]); if (p) hits.push(p); } });
+    box.innerHTML = hits.slice(0, 8).map(p => '<button class="gr" data-tfadd="' + k + '" data-id="' + esc(p.id) + '"><span>' + esc(p.name) + ' <span class="muted small">' + esc(p.pos === 'PICK' ? (p.team || '') : p.pos + ' ' + (p.team || '')) + '</span></span><b class="num">' + fmt(p.value) + '</b></button>').join('') || '<p class="muted small">No match.</p>';
+    box._hits = hits;
+  };
+  ['a', 'b'].forEach(k => {
+    $('#tf' + k).onchange = e => { st[k] = +e.target.value; };
+    $('#tfq' + k).addEventListener('input', () => search(k));
+    $('#tfr' + k).addEventListener('click', e => { const b = e.target.closest('[data-tfadd]'); if (!b) return; const p = ($('#tfr' + k)._hits || []).find(x => x.id === b.dataset.id); if (p) { st['g' + k].push(p); chips(k); $('#tfq' + k).value = ''; search(k); $('#tfq' + k).focus(); } });
+    $('#tfc' + k).addEventListener('click', e => { const b = e.target.closest('[data-tfrm]'); if (!b) return; st['g' + k].splice(+b.dataset.tfrm.slice(1), 1); chips(k); });
+    chips(k);
+  });
+  $('#tfSave').onclick = () => {
+    const msg = $('#tfMsg');
+    if (st.a === st.b) { msg.textContent = 'Pick two different teams.'; return; }
+    if (!st.ga.length && !st.gb.length) { msg.textContent = 'Add at least one player or pick.'; return; }
+    const items = st.ga.map(p => [keyOf(p), st.b, st.a]).concat(st.gb.map(p => [keyOf(p), st.a, st.b]));
+    const dv = $('#tfd').value ? new Date($('#tfd').value + 'T12:00:00').getTime() : Date.now();
+    lg.manualTrades = (lg.manualTrades || []).concat({ manual: 'mt' + Date.now(), d: dv, items });
+    save([lg.id]); close(); render();
+  };
+  $('#tfqa').focus();
+}
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  if (el.dataset.act === 'tradeAdd') openTradeForm();
+  else if (el.dataset.act === 'tradeDel') { const lg = S.leagues[S.active]; lg.manualTrades = (lg.manualTrades || []).filter(x => x.manual !== el.dataset.id); save([lg.id]); render(); }
+});
 
 function valueChart(m, t) {
   const h = (m.lg.history || []).filter(s => s.t && s.t[t.id]);
