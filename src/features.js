@@ -1,5 +1,47 @@
 /* ---------- Feature logic: trade grades, counters, block, history, planner, offseason, mock draft, rivals, records ---------- */
 
+/* Trades recorded in the app's data file (src/trades.json): pick trades and others ESPN doesn't report.
+   Each side's team is matched by name (team or manager, ignoring doubled letters), or else by who rosters what that side received. */
+function resolveLeagueTrades(lg, teams) {
+  const out = { trades: [], pickOwners: {} };
+  const list = typeof LEAGUE_TRADES !== 'undefined' && Array.isArray(LEAGUE_TRADES) ? LEAGUE_TRADES : [];
+  const squash = s => nk(s).replace(/(.)\1+/g, '$1');
+  const toks = x => String(x || '').toLowerCase().split(/[^a-z0-9]+/).map(w => w.replace(/(.)\1+/g, '$1')).filter(w => w.length > 1);
+  const close = (a, b) => a === b || (a.length > 3 && b.length > 3 && a.slice(0, 3) === b.slice(0, 3) && Math.abs(a.length - b.length) <= 2);
+  const fuzzy = nm => { const q = toks(nm); if (q.length < 2) return null; let best = null, bs = 0; teams.forEach(t => { const w = toks(t.name); const hit = q.filter(x => w.some(y => close(x, y))).length / Math.max(q.length, w.length); if (hit > bs) { bs = hit; best = t; } }); return bs >= 0.6 ? best : null; };
+  const byName0 = nm => { const q = squash(nm); if (!q) return null; return teams.find(t => squash(t.name) === q || squash(t.owner || '') === q) || teams.find(t => squash(t.name).includes(q) || squash(t.owner || '').split(' ').some(w => w && (w === q || w + 's' === q || q + 's' === w))) || null; };
+  const byName = nm => byName0(nm) || fuzzy(nm);
+  const holder = nm => { const k = nk(nm); for (const t of teams) for (const r of t.roster) if (nk(r[1]) === k) return { t, id: r[0] }; return null; };
+  const espnId = nm => { const h = holder(nm); if (h) return h.id; const k = nk(nm); const a = typeof ALLPLAYERS !== 'undefined' && ALLPLAYERS && ALLPLAYERS.players.find(r => nk(r[1]) === k); return a ? a[0] : null; };
+  list.forEach(tr => {
+    if (tr.league && tr.league !== (lg.type === 'dynasty' ? 'dynasty' : 'redraft')) return;
+    if (!Array.isArray(tr.sides) || tr.sides.length !== 2) return;
+    const sideTeams = tr.sides.map(s => byName(s.team) || (() => { const hs = s.got.filter(g => typeof g === 'string').map(holder).filter(Boolean); return hs.length ? hs[0].t : null; })());
+    if (!sideTeams[0] || !sideTeams[1] || sideTeams[0] === sideTeams[1]) return;
+    const items = [];
+    let ok = true;
+    tr.sides.forEach((s, i) => {
+      const to = sideTeams[i], from = sideTeams[1 - i];
+      s.got.forEach(g => {
+        if (typeof g === 'string') { const id = espnId(g); if (id == null) ok = false; else items.push([+id, from.id, to.id]); }
+        else if (g && g.pick) {
+          const [y, r, origName] = g.pick;
+          const orig = (origName && byName(origName)) || from;
+          const pid = 'pk' + y + '-' + r + '-' + orig.id;
+          items.push([pid, from.id, to.id]);
+          out.pickOwners[pid] = to.id;
+        }
+      });
+    });
+    if (!ok) return;
+    const ms = tr.date ? new Date(tr.date + 'T12:00:00').getTime() : 0;
+    out.trades.push({ d: ms, items, league: true });
+  });
+  /* Picks in trades the user added by hand move too, oldest first. */
+  (lg.manualTrades || []).slice().sort((a, b) => (a.d || 0) - (b.d || 0)).forEach(t => (t.items || []).forEach(([pid, , to]) => { if (typeof pid === 'string' && /^pk/.test(pid)) out.pickOwners[pid] = to; }));
+  return out;
+}
+
 /* Value of a traded player today, whether or not he's still on a roster. */
 function assetNow(m, pid) {
   if (typeof pid === 'string' && !/^\d+$/.test(pid)) {
@@ -16,7 +58,8 @@ function assetNow(m, pid) {
 function tradeGrades(m) {
   const synced = Array.isArray(m.lg.trades) ? m.lg.trades : [];
   const manual = (Array.isArray(m.lg.manualTrades) ? m.lg.manualTrades : []).filter(x => !synced.some(s => tradeKey(s.items) === tradeKey(x.items)));
-  const trades = synced.concat(manual);
+  const baked = (m.bakedTrades || []).filter(x => !synced.concat(manual).some(s => tradeKey(s.items) === tradeKey(x.items)));
+  const trades = synced.concat(manual, baked);
   return trades.slice().sort((a, b) => (b.d || 0) - (a.d || 0)).map(x => {
     const sides = {};
     x.items.forEach(([pid, from, to]) => { (sides[to] = sides[to] || { got: [] }).got.push(assetNow(m, pid)); sides[from] = sides[from] || { got: [] }; });
@@ -26,7 +69,7 @@ function tradeGrades(m) {
     const top = rows[0], second = rows[1] || { v: 0 };
     const margin = top.v ? (top.v - second.v) / top.v : 0;
     const grade = margin < 0.07 ? 'Even' : margin < 0.2 ? 'Edge' : 'Win';
-    return { d: x.d, rows, winner: margin < 0.07 ? null : top.team, margin, grade, manual: x.manual || null, pending: !!x.pending };
+    return { d: x.d, rows, winner: margin < 0.07 ? null : top.team, margin, grade, manual: x.manual || null, pending: !!x.pending, league: !!x.league };
   });
 }
 

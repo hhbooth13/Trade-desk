@@ -180,7 +180,8 @@ function buildModel(lg, vs) {
   estimateValues(everyone, vs, lg.type === 'dynasty' ? 'dynasty' : 'redraft', everyone);
   applyNews(everyone, typeof NEWS !== 'undefined' ? NEWS : null, lg.type === 'dynasty' ? 'dynasty' : 'redraft');
   applyOverrides(everyone, lg.valueOverrides);
-  const picks = lg.type === 'dynasty' ? draftPicks(lg, vs, teams) : [];
+  const baked = typeof resolveLeagueTrades === 'function' ? resolveLeagueTrades(lg, teams) : { trades: [], pickOwners: {} };
+  const picks = lg.type === 'dynasty' ? draftPicks(Object.assign({}, lg, { pickOwners: Object.assign({}, baked.pickOwners, lg.pickOwners || {}) }), vs, teams) : [];
   const byId = new Map(teams.map(t => [t.id, t]));
   picks.forEach(p => { const t = byId.get(p.owner); if (t) t.picks.push(p); });
   teams.forEach(t => { analyzeTeam(t, lg.slots); t.pickValue = t.picks.reduce((a, p) => a + p.value, 0); t.totalValue += t.pickValue; });
@@ -201,7 +202,7 @@ function buildModel(lg, vs) {
       .map(x => ({ id: x.id, espn: x.espn, name: x.name, pos: x.pos, team: x.team, slot: 20, inj: '', value: x.value, fcValue: x.value, age: x.age, trend: x.trend, owner: null, est: '' }));
     faSource = 'fc';
   }
-  return { lg, vs, teams, byId, players, picks, freeAgents, faSource };
+  return { lg, vs, teams, byId, players, picks, freeAgents, faSource, bakedTrades: baked.trades };
 }
 
 /* ---------- Dynasty draft picks ----------

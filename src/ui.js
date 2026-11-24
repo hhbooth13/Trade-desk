@@ -97,7 +97,7 @@ function model() { return modelFor(S.leagues[S.active]); }
 function modelFor(lg) {
   if (!lg) return null;
   const vs = getVS(lg);
-  const key = [lg.id, lg.mode || '', JSON.stringify(lg.valueOverrides || {}), lg.type, lg.syncedAt, vs.src.asOf, vs.src.txt.length, lg.myTeamId, lg.pickRounds || 3, JSON.stringify(lg.pickOwners || {})].join('|');
+  const key = [lg.id, lg.mode || '', JSON.stringify(lg.valueOverrides || {}), lg.type, lg.syncedAt, vs.src.asOf, vs.src.txt.length, lg.myTeamId, lg.pickRounds || 3, JSON.stringify(lg.pickOwners || {}), JSON.stringify(lg.manualTrades || [])].join('|');
   let c = modelCache.get(lg.id);
   if (!c || c.key !== key) { c = { key, m: buildModel(lg, vs) }; modelCache.set(lg.id, c); }
   return c.m;
@@ -703,7 +703,7 @@ document.addEventListener('change', e => {
   else if (act === 'pickOwner') {
     const p = model().players.get(el.dataset.id);
     lg.pickOwners = lg.pickOwners || {};
-    if (p && +val === p.orig) delete lg.pickOwners[el.dataset.id]; else lg.pickOwners[el.dataset.id] = +val;
+    lg.pickOwners[el.dataset.id] = +val;
     save([lg.id]); render();
   }
   else if (act === 'lrounds') { S.leagues[el.dataset.id].pickRounds = +val; save([el.dataset.id]); render(); }
