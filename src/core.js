@@ -174,9 +174,26 @@ function rankTeams(teams) {
   });
 }
 
+/* Short label for each team: the manager's first name (team names and ESPN abbreviations change too often).
+   Shared first names get a last initial. Falls back to the ESPN abbreviation when there's no manager name. */
+function ownerLabels(teams, lg) {
+  if (lg.demo) return;
+  const first = t => { const o = String(t.owner || '').split(',')[0].trim(); return o && o !== 'You' ? o : ''; };
+  const fn = t => first(t).split(/\s+/)[0] || '';
+  const count = {}; teams.forEach(t => { const f = fn(t).toLowerCase(); if (f) count[f] = (count[f] || 0) + 1; });
+  teams.forEach(t => {
+    const full = first(t), f = fn(t);
+    if (!f) return;
+    const parts = full.split(/\s+/), last = parts.length > 1 ? parts[parts.length - 1] : '';
+    t.espnAbbrev = t.abbrev;
+    t.abbrev = count[f.toLowerCase()] > 1 && last ? f + ' ' + last[0].toUpperCase() + '.' : f;
+    t.ownerInitials = (f[0] + (last ? last[0] : (f[1] || ''))).toUpperCase();
+  });
+}
 function buildModel(lg, vs) {
   WAIVER_DYNASTY = lg.type === 'dynasty';
   const teams = lg.teams.map(t => Object.assign({}, t, { players: t.roster.map(r => mkPlayer(r, vs, t.id)), picks: [] }));
+  ownerLabels(teams, lg);
   const everyone = [].concat(...teams.map(t => t.players));
   estimateValues(everyone, vs, lg.type === 'dynasty' ? 'dynasty' : 'redraft', everyone);
   applyNews(everyone, typeof NEWS !== 'undefined' ? NEWS : null, lg.type === 'dynasty' ? 'dynasty' : 'redraft');

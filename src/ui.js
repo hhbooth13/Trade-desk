@@ -202,7 +202,7 @@ function teamBadge(abbr) {
 function fteamAvatar(t, size) {
   if (!t) return '';
   let h = 0; for (const ch of String(t.name || '')) h = (h * 31 + ch.charCodeAt(0)) % 360;
-  const txt = String(t.abbrev || t.name || '?').slice(0, size === 'xs' ? 2 : 4);
+  const txt = t.ownerInitials || String(t.abbrev || t.name || '?').slice(0, size === 'xs' ? 2 : 4);
   const src = logoSrc(t.logo);
   const logo = src ? '<img class="av-img" src="' + esc(src) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '';
   return '<span class="av ' + (size || '') + (logo ? ' has-img' : '') + '" style="background:hsl(' + h + ' 55% 34%);--ring:hsl(' + h + ' 65% 62%);' + (txt.length > 3 && size !== 'xs' ? 'font-size:10px' : '') + '" aria-hidden="true">' + esc(txt) + logo + '</span>';

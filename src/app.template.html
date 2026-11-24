@@ -317,9 +317,9 @@ details summary { cursor: pointer; color: var(--accent); font-size: 14px; font-w
 .cell.bad { background: var(--bad-soft); color: var(--bad); }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .grid3 .row-pl > .small { padding-left: 46px; }
-.mock { display: grid; grid-template-columns: 52px 28px 44px auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.mock { display: grid; grid-template-columns: 52px 28px 72px auto minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); }
 .mock.me { background: var(--accent-soft); border-radius: 10px; padding-left: 6px; padding-right: 6px; }
-.mock-team { font-weight: 800; font-size: 12px; color: var(--muted); }
+.mock-team { font-weight: 800; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mock-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rival { padding: 12px 0; border-top: 1px solid var(--line); margin-top: 10px; }
 .records { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
@@ -436,7 +436,7 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--a
 .chip.on { background: rgba(56, 200, 245, .14); color: #fff; border-color: transparent; box-shadow: var(--glow); }
 .chip-team, .own-t, .pr-own { display: inline-flex; align-items: center; gap: 6px; }
 .chip-team { padding: 4px 12px 4px 4px; }
-.mock-team { display: inline-flex; align-items: center; gap: 5px; }
+
 .av.xs { width: 20px; height: 20px; font-size: 8px; box-shadow: inset 0 0 0 1.5px var(--ring, rgba(255,255,255,.25)); }
 .subtabs { background: rgba(18, 26, 42, .6); border-color: var(--line); border-radius: 14px; backdrop-filter: blur(12px); }
 .subtabs a { font-family: var(--display); border-radius: 10px; }
