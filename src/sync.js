@@ -1,5 +1,7 @@
 /* ---------- Built-in sync for the Home Screen app (public ESPN leagues, no login needed) ---------- */
 const ESPN = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl';
+/* Always ask ESPN for fresh league data; never reuse a copy the phone cached from an earlier sync. */
+const NOCACHE = { cache: 'no-store' };
 function parseLeagueId(s) {
   const m = String(s || '').match(/leagueId=(\d+)/i) || String(s || '').match(/^\s*(\d{3,})\s*$/);
   return m ? m[1] : null;
@@ -62,7 +64,7 @@ async function espnSync(id, progress) {
   const yr = now.getMonth() < 2 ? now.getFullYear() - 1 : now.getFullYear();
   const base = ESPN + '/seasons/' + yr + '/segments/0/leagues/' + id;
   progress('Reading league from ESPN…');
-  const r = await fetch(base + '?view=mTeam&view=mRoster&view=mSettings&view=mMatchupScore');
+  const r = await fetch(base + '?view=mTeam&view=mRoster&view=mSettings&view=mMatchupScore', NOCACHE);
   if (r.status === 401 || r.status === 403) throw new Error('This league is private. Ask your commissioner to turn on “League Viewable to Public” in ESPN league settings, then sync again.');
   if (r.status === 404) throw new Error('ESPN has no league with ID ' + id + ' for ' + yr + '. Check the ID.');
   if (!r.ok) throw new Error('ESPN answered ' + r.status + '. Try again in a minute.');
@@ -95,7 +97,7 @@ async function espnSync(id, progress) {
   const trades = [];
   try {
     const filter = { players: { filterStatus: { value: ['FREEAGENT', 'WAIVERS'] }, filterSlotIds: { value: [0, 2, 4, 6, 16, 17] }, limit: 150, sortPercOwned: { sortPriority: 1, sortAsc: false } } };
-    const fr = await fetch(base + '?view=kona_player_info', { headers: { 'x-fantasy-filter': JSON.stringify(filter) } });
+    const fr = await fetch(base + '?view=kona_player_info', { cache: 'no-store', headers: { 'x-fantasy-filter': JSON.stringify(filter) } });
     if (fr.ok) fa = ((await fr.json()).players || []).map(x => { const p = x.player || {}; return [x.id || p.id, p.fullName || '', p.defaultPositionId || 0, p.proTeamId || 0, x.status === 'WAIVERS' ? 1 : 0, p.injuryStatus || '', p.ownership && p.ownership.percentOwned != null ? r1(p.ownership.percentOwned) : null]; });
   } catch (e) {}
   try {
@@ -123,11 +125,11 @@ async function espnSync(id, progress) {
     const weeks = [];
     for (let w = 1; w <= (L.scoringPeriodId || 1) + 1; w++) weeks.push(w);
     const txs = [].concat(...await Promise.all(weeks.map(async w => {
-      try { const tr = await fetch(base + '?view=mTransactions2&scoringPeriodId=' + w); return tr.ok ? ((await tr.json()).transactions || []) : []; } catch (e) { return []; }
+      try { const tr = await fetch(base + '?view=mTransactions2&scoringPeriodId=' + w, NOCACHE); return tr.ok ? ((await tr.json()).transactions || []) : []; } catch (e) { return []; }
     })));
     let topics = [];
     try {
-      const cr = await fetch(base + '/communication/?view=kona_league_communication', { headers: { 'x-fantasy-filter': '{"topics":{"filterType":{"value":["ACTIVITY_TRANSACTIONS"]},"limit":250,"limitPerMessageSet":{"value":50},"offset":0,"sortMessageDate":{"sortPriority":1,"sortAsc":false},"sortFor":{"sortPriority":2,"sortAsc":false},"filterIncludeMessageTypeIds":{"value":[244]}}}' } });
+      const cr = await fetch(base + '/communication/?view=kona_league_communication', { cache: 'no-store', headers: { 'x-fantasy-filter': '{"topics":{"filterType":{"value":["ACTIVITY_TRANSACTIONS"]},"limit":250,"limitPerMessageSet":{"value":50},"offset":0,"sortMessageDate":{"sortPriority":1,"sortAsc":false},"sortFor":{"sortPriority":2,"sortAsc":false},"filterIncludeMessageTypeIds":{"value":[244]}}}' } });
       if (cr.ok) topics = (await cr.json()).topics || [];
     } catch (e) {}
     collectTrades(txs, topics).forEach(t => trades.push(t));
