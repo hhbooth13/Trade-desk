@@ -94,6 +94,31 @@
         }
       ],
       "processes": "2026-11-24T18:15:00-05:00"
+    },
+    {
+      "league": "dynasty",
+      "date": "2026-11-24",
+      "sides": [
+        {
+          "team": "The Aggressors",
+          "got": [
+            "Tetairoa McMillan",
+            {
+              "pick": [
+                2028,
+                1,
+                "Shough Knight"
+              ]
+            }
+          ]
+        },
+        {
+          "team": "Shough Knight",
+          "got": [
+            "Justin Jefferson"
+          ]
+        }
+      ]
     }
   ]
 }

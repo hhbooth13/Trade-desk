@@ -68,7 +68,9 @@ function tradeGrades(m) {
   const covered = t => (m.bakedTrades || []).concat(m.lg.manualTrades || []).some(b => t.items.every(i => b.items.some(j => j.join(':') === i.join(':'))));
   const synced = (Array.isArray(m.lg.trades) ? m.lg.trades : []).filter(t => !covered(t));
   const manual = (Array.isArray(m.lg.manualTrades) ? m.lg.manualTrades : []).filter(x => !synced.some(s => tradeKey(s.items) === tradeKey(x.items)));
-  const baked = (m.bakedTrades || []).filter(x => !synced.concat(manual).some(s => tradeKey(s.items) === tradeKey(x.items)));
+  /* A recorded trade (e.g. one with draft picks) takes the review status and processing time ESPN reports for its players. */
+  const fromEspn = b => { const s = (Array.isArray(m.lg.trades) ? m.lg.trades : []).find(t => t.pending && t.items.length && t.items.every(i => b.items.some(j => j.join(':') === i.join(':')))); return s && !b.processes ? Object.assign({}, b, { pending: true, processes: s.processes }) : b; };
+  const baked = (m.bakedTrades || []).filter(x => !synced.concat(manual).some(s => tradeKey(s.items) === tradeKey(x.items))).map(fromEspn);
   const trades = synced.concat(manual, baked);
   return trades.slice().sort((a, b) => (b.d || 0) - (a.d || 0)).map(x => {
     const sides = {};
