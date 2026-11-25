@@ -12,12 +12,12 @@ function normLogo(u) {
 function tradeKey(items) { return items.map(i => i.join(':')).sort().join(','); }
 function collectTrades(txs, topics) {
   const out = [], seen = new Set();
-  const add = (d, items, pending) => {
+  const add = (d, items, pending, proc) => {
     if (!items.length) return;
     const k = tradeKey(items);
     const prev = out.find(x => x.k === k);
-    if (prev) { if (!pending) prev.pending = false; return; }
-    out.push({ k, d, items, pending: !!pending });
+    if (prev) { if (!pending) prev.pending = false; else if (proc && !prev.proc) prev.proc = proc; return; }
+    out.push({ k, d, items, pending: !!pending, proc: proc || 0 });
   };
   (txs || []).forEach(t => {
     if (!/TRADE_(ACCEPT|UPHOLD|PROPOSAL)/.test(t.type || '') && t.type !== 'TRADE') return;
@@ -26,7 +26,9 @@ function collectTrades(txs, topics) {
     if (t.type === 'TRADE_PROPOSAL' && st !== 'EXECUTED' && st !== 'PENDING' && st !== 'ACCEPTED') return;
     if (t.type === 'TRADE_PROPOSAL' && st === 'PENDING') return;
     const items = (t.items || []).filter(i => i.type === 'TRADE' || (i.fromTeamId > 0 && i.toTeamId > 0)).map(i => [i.playerId, i.fromTeamId, i.toTeamId]);
-    add(t.processDate || t.proposedDate || 0, items, st !== 'EXECUTED');
+    /* Accepted but not yet processed: show it as in review, with ESPN's processing time. */
+    const pend = st !== 'EXECUTED' && (!t.processDate || t.processDate > Date.now());
+    add(pend ? (t.proposedDate || t.processDate || 0) : (t.processDate || t.proposedDate || 0), items, pend, pend ? t.processDate || 0 : 0);
   });
   (topics || []).forEach(tp => {
     const ms = (tp.messages || []).filter(x => x.messageTypeId === 244 && x.targetId);
@@ -35,7 +37,7 @@ function collectTrades(txs, topics) {
     const items = ms.map(x => [x.targetId, x.from, x.to > 0 ? x.to : (froms.length === 2 ? froms.find(f => f !== x.from) : 0)]).filter(i => i[1] > 0 && i[2] > 0);
     add(tp.date || (ms[0] && ms[0].date) || 0, items, false);
   });
-  return out.map(x => ({ d: x.d, items: x.items, pending: x.pending || undefined }));
+  return out.map(x => ({ d: x.d, items: x.items, pending: x.pending || undefined, processes: x.pending && x.proc ? x.proc : undefined }));
 }
   const H = location.hostname, P = new URLSearchParams(location.search);
   const css = 'all:initial;position:fixed;z-index:2147483647;top:16px;right:16px;width:360px;max-width:calc(100vw - 32px);background:#101827;color:#eef2f7;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;padding:16px;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.45);border:1px solid #2b3a52;box-sizing:border-box';
@@ -178,6 +180,7 @@ function collectTrades(txs, topics) {
       for (let w = 1; w <= (L.scoringPeriodId || 1) + 1; w++) {
         try { const r = await fetch(hostOK + '/apis/v3/games/ffl/seasons/' + yr + '/segments/0/leagues/' + id + '?view=mTransactions2&scoringPeriodId=' + w, { credentials: 'include' }); if (r.ok) txs.push(...((await r.json()).transactions || [])); } catch (e) {}
       }
+      try { const r = await fetch(hostOK + '/apis/v3/games/ffl/seasons/' + yr + '/segments/0/leagues/' + id + '?view=mPendingTransactions', { credentials: 'include' }); if (r.ok) { const pj = await r.json(); txs.push(...(pj.pendingTransactions || []), ...(pj.transactions || [])); } } catch (e) {}
       let topics = [];
       try { const cr = await fetch(hostOK + '/apis/v3/games/ffl/seasons/' + yr + '/segments/0/leagues/' + id + '/communication/?view=kona_league_communication', { credentials: 'include', headers: { 'x-fantasy-filter': '{"topics":{"filterType":{"value":["ACTIVITY_TRANSACTIONS"]},"limit":250,"limitPerMessageSet":{"value":50},"offset":0,"sortMessageDate":{"sortPriority":1,"sortAsc":false},"sortFor":{"sortPriority":2,"sortAsc":false},"filterIncludeMessageTypeIds":{"value":[244]}}}' } }); if (cr.ok) topics = (await cr.json()).topics || []; } catch (e) {}
       collectTrades(txs, topics).forEach(t => trades.push(t));

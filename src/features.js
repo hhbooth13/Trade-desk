@@ -84,7 +84,7 @@ function tradeGrades(m) {
     const top = rows[0], second = rows[1] || { v: 0 };
     const margin = top.v ? (top.v - second.v) / top.v : 0;
     const grade = margin < 0.07 ? 'Even' : margin < 0.2 ? 'Edge' : 'Win';
-    return { d: x.d, rows, winner: margin < 0.07 ? null : top.team, margin, grade, manual: x.manual || null, pending: !!x.pending, processes: x.processes || null, league: !!x.league };
+    return { d: x.d, rows, winner: margin < 0.07 ? null : top.team, margin, grade, manual: x.manual || null, pending: !!x.pending && !(x.processes && x.processes < Date.now()), processes: x.processes || null, league: !!x.league };
   });
 }
 

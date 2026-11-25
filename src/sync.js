@@ -33,12 +33,12 @@ function normLogo(u) {
 function tradeKey(items) { return items.map(i => i.join(':')).sort().join(','); }
 function collectTrades(txs, topics) {
   const out = [], seen = new Set();
-  const add = (d, items, pending) => {
+  const add = (d, items, pending, proc) => {
     if (!items.length) return;
     const k = tradeKey(items);
     const prev = out.find(x => x.k === k);
-    if (prev) { if (!pending) prev.pending = false; return; }
-    out.push({ k, d, items, pending: !!pending });
+    if (prev) { if (!pending) prev.pending = false; else if (proc && !prev.proc) prev.proc = proc; return; }
+    out.push({ k, d, items, pending: !!pending, proc: proc || 0 });
   };
   (txs || []).forEach(t => {
     if (!/TRADE_(ACCEPT|UPHOLD|PROPOSAL)/.test(t.type || '') && t.type !== 'TRADE') return;
@@ -47,7 +47,9 @@ function collectTrades(txs, topics) {
     if (t.type === 'TRADE_PROPOSAL' && st !== 'EXECUTED' && st !== 'PENDING' && st !== 'ACCEPTED') return;
     if (t.type === 'TRADE_PROPOSAL' && st === 'PENDING') return;
     const items = (t.items || []).filter(i => i.type === 'TRADE' || (i.fromTeamId > 0 && i.toTeamId > 0)).map(i => [i.playerId, i.fromTeamId, i.toTeamId]);
-    add(t.processDate || t.proposedDate || 0, items, st !== 'EXECUTED');
+    /* Accepted but not yet processed: show it as in review, with ESPN's processing time. */
+    const pend = st !== 'EXECUTED' && (!t.processDate || t.processDate > Date.now());
+    add(pend ? (t.proposedDate || t.processDate || 0) : (t.processDate || t.proposedDate || 0), items, pend, pend ? t.processDate || 0 : 0);
   });
   (topics || []).forEach(tp => {
     const ms = (tp.messages || []).filter(x => x.messageTypeId === 244 && x.targetId);
@@ -56,7 +58,7 @@ function collectTrades(txs, topics) {
     const items = ms.map(x => [x.targetId, x.from, x.to > 0 ? x.to : (froms.length === 2 ? froms.find(f => f !== x.from) : 0)]).filter(i => i[1] > 0 && i[2] > 0);
     add(tp.date || (ms[0] && ms[0].date) || 0, items, false);
   });
-  return out.map(x => ({ d: x.d, items: x.items, pending: x.pending || undefined }));
+  return out.map(x => ({ d: x.d, items: x.items, pending: x.pending || undefined, processes: x.pending && x.proc ? x.proc : undefined }));
 }
 async function espnSync(id, progress) {
   progress = progress || (() => {});
@@ -127,6 +129,11 @@ async function espnSync(id, progress) {
     const txs = [].concat(...await Promise.all(weeks.map(async w => {
       try { const tr = await fetch(base + '?view=mTransactions2&scoringPeriodId=' + w, NOCACHE); return tr.ok ? ((await tr.json()).transactions || []) : []; } catch (e) { return []; }
     })));
+    /* Accepted trades still in the league's review period only show up in ESPN's pending-transactions view. */
+    try {
+      const pr = await fetch(base + '?view=mPendingTransactions', NOCACHE);
+      if (pr.ok) { const pj = await pr.json(); [].concat(pj.pendingTransactions || [], pj.transactions || []).forEach(t => txs.push(t)); }
+    } catch (e) {}
     let topics = [];
     try {
       const cr = await fetch(base + '/communication/?view=kona_league_communication', { cache: 'no-store', headers: { 'x-fantasy-filter': '{"topics":{"filterType":{"value":["ACTIVITY_TRANSACTIONS"]},"limit":250,"limitPerMessageSet":{"value":50},"offset":0,"sortMessageDate":{"sortPriority":1,"sortAsc":false},"sortFor":{"sortPriority":2,"sortAsc":false},"filterIncludeMessageTypeIds":{"value":[244]}}}' } });
