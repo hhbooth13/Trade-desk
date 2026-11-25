@@ -119,6 +119,25 @@
           ]
         }
       ]
+    },
+    {
+      "league": "dynasty",
+      "date": "2026-11-24",
+      "sides": [
+        {
+          "team": "The Aggressors",
+          "got": [
+            "Luther Burden III"
+          ]
+        },
+        {
+          "team": "Travis Hunter's Loving Wife",
+          "got": [
+            "Trevor Lawrence",
+            "Zach Charbonnet"
+          ]
+        }
+      ]
     }
   ]
 }
