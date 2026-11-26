@@ -534,7 +534,7 @@ function viewOutlook(m) {
     sellers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="grade-got">' + r.sellers.map(chip).join('') + '</div></div>').join('') + '</section>' : '') +
     (buyers.length ? '<section class="card mt"><h3>Teams buying now</h3><p class="muted small">Teams built for this season. They’re the ones to sell your veterans to, and they may give up young players or picks.</p>' +
     buyers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="small muted">Young players they could move: </div><div class="grade-got">' + r.young.map(chip).join('') + '</div></div>').join('') + '</section>' : '');
-  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years age every player along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third. Tap any team for its game plan.</p>' +
+  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years count every player, including those on IR, aged along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third. Tap any team for its game plan.</p>' +
     mine + table + market;
 }
 

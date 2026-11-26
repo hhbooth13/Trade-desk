@@ -278,7 +278,7 @@ if (typeof module !== 'undefined' && module.exports) Object.assign(module.export
 
 /* ---------- Dynasty outlook: how strong each team looks now, next year, and three years out ----------
    Now: this season's lineup using redraft values (injuries and news included).
-   Later: each player's dynasty value moved along his position's age curve, plus the draft picks a team
+   Later: each player's dynasty value (IR players included) moved along his position's age curve, plus the draft picks a team
    owns turning into rookies (a pick counts for 55% in its first season, 85% in the next, then 100%). */
 function outlookLater(p, k) { if (!p.age || !PEAK_AGE[p.pos]) return p.value * Math.pow(0.9, k); return p.value * ageFactor(p.pos, p.age + k) / ageFactor(p.pos, p.age); }
 function dynastyOutlook(m) {
@@ -298,7 +298,8 @@ function dynastyOutlook(m) {
   const rows = m.teams.map(t => {
     const sk = t.players.filter(p => SKILL.includes(p.pos) || p.pos === 'K' || p.pos === 'D/ST');
     const scores = WIN.map(w => {
-      const proj = sk.map(p => Object.assign({}, p, { pv: w.k === 0 ? nowVal(p) : later(p, w.k) }));
+      /* Players in the IR slot sit out "Now" but count in later years: they'll be healthy by then. */
+      const proj = sk.map(p => Object.assign({}, p, w.k === 0 ? { pv: nowVal(p) } : { pv: later(p, w.k), slot: p.slot === 21 ? 20 : p.slot }));
       let s = lineup(proj, m.lg.slots, 'pv').value;
       if (w.k > 0) (t.picks || []).forEach(pk => { const yrs = season + w.k - pk.year; if (yrs >= 0) s += 0.5 * pk.value * [0.55, 0.85, 1][Math.min(2, yrs)]; });
       return s;

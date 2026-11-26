@@ -1559,7 +1559,7 @@ if (typeof module !== 'undefined' && module.exports) Object.assign(module.export
 
 /* ---------- Dynasty outlook: how strong each team looks now, next year, and three years out ----------
    Now: this season's lineup using redraft values (injuries and news included).
-   Later: each player's dynasty value moved along his position's age curve, plus the draft picks a team
+   Later: each player's dynasty value (IR players included) moved along his position's age curve, plus the draft picks a team
    owns turning into rookies (a pick counts for 55% in its first season, 85% in the next, then 100%). */
 function outlookLater(p, k) { if (!p.age || !PEAK_AGE[p.pos]) return p.value * Math.pow(0.9, k); return p.value * ageFactor(p.pos, p.age + k) / ageFactor(p.pos, p.age); }
 function dynastyOutlook(m) {
@@ -1579,7 +1579,8 @@ function dynastyOutlook(m) {
   const rows = m.teams.map(t => {
     const sk = t.players.filter(p => SKILL.includes(p.pos) || p.pos === 'K' || p.pos === 'D/ST');
     const scores = WIN.map(w => {
-      const proj = sk.map(p => Object.assign({}, p, { pv: w.k === 0 ? nowVal(p) : later(p, w.k) }));
+      /* Players in the IR slot sit out "Now" but count in later years: they'll be healthy by then. */
+      const proj = sk.map(p => Object.assign({}, p, w.k === 0 ? { pv: nowVal(p) } : { pv: later(p, w.k), slot: p.slot === 21 ? 20 : p.slot }));
       let s = lineup(proj, m.lg.slots, 'pv').value;
       if (w.k > 0) (t.picks || []).forEach(pk => { const yrs = season + w.k - pk.year; if (yrs >= 0) s += 0.5 * pk.value * [0.55, 0.85, 1][Math.min(2, yrs)]; });
       return s;
@@ -2488,7 +2489,7 @@ function viewOutlook(m) {
     sellers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="grade-got">' + r.sellers.map(chip).join('') + '</div></div>').join('') + '</section>' : '') +
     (buyers.length ? '<section class="card mt"><h3>Teams buying now</h3><p class="muted small">Teams built for this season. They’re the ones to sell your veterans to, and they may give up young players or picks.</p>' +
     buyers.map(r => '<div class="mkt"><div class="tcell">' + fteamAvatar(r.team, 'sm') + '<b>' + teamName(r.team) + '</b>' + tag(r.label) + '</div><div class="small muted">Young players they could move: </div><div class="grade-got">' + r.young.map(chip).join('') + '</div></div>').join('') + '</section>' : '');
-  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years age every player along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third. Tap any team for its game plan.</p>' +
+  return '<section class="head-row"><h2>Dynasty outlook</h2></section><p class="muted small lead">Where each team stands this season, next season and three years out. Now uses this year’s values with injuries; later years count every player, including those on IR, aged along his position’s curve and turn owned draft picks into rookies. Green is the top third of the league, red the bottom third. Tap any team for its game plan.</p>' +
     mine + table + market;
 }
 
