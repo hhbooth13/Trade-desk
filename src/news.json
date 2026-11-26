@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-25",
+ "updated": "2026-11-26",
  "items": [
   {
    "name": "De'Von Achane",
@@ -36,6 +36,33 @@
    "note": "Released by the Colts and went unclaimed on waivers, so he is a free agent with no starting job lined up.",
    "date": "2026-11-24",
    "until": "2027-01-10"
+  },
+  {
+   "name": "Aaron Rodgers",
+   "espn": "8439",
+   "redraft": 0.4,
+   "dynasty": 0.6,
+   "note": "The Steelers benched him for Friday's game against Denver and released him a day later. He's a 43-year-old free agent who had already called 2026 his final season.",
+   "date": "2026-11-26",
+   "until": "2027-01-10"
+  },
+  {
+   "name": "Mason Rudolph",
+   "espn": "3116407",
+   "redraft": 1.2,
+   "dynasty": 1.05,
+   "note": "Takes over as Pittsburgh's starting quarterback after Aaron Rodgers was benched and released, starting with Friday's game against the Broncos.",
+   "date": "2026-11-26",
+   "until": "2027-01-10"
+  },
+  {
+   "name": "J.K. Dobbins",
+   "espn": "4241985",
+   "redraft": 0.9,
+   "dynasty": 1.0,
+   "note": "Sean Payton suspended him for one game for conduct detrimental to the team. He should be back for the following week.",
+   "date": "2026-11-26",
+   "until": "2026-12-11"
   }
  ]
 }
