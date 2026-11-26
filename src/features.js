@@ -276,15 +276,15 @@ function leagueRecords(m) {
 
 if (typeof module !== 'undefined' && module.exports) Object.assign(module.exports, { tradeGrades, counterOffers, applyBlock, snapshot, byePlanner, offseasonPlan, mockDraft, rivalChanges, rosterSnapshot, leagueRecords });
 
-/* ---------- Dynasty outlook: how strong each team looks now, next year, and three years out ----------
+/* ---------- Dynasty outlook: how strong each team looks now and in each of the next two seasons ----------
    Now: this season's lineup using redraft values (injuries and news included).
    Later: each player's dynasty value (IR players included) moved along his position's age curve, plus the draft picks a team
-   owns turning into rookies (a pick counts for 55% in its first season, 85% in the next, then 100%). */
+   owns, each at its full trade value in every later year. */
 function outlookLater(p, k) { if (!p.age || !PEAK_AGE[p.pos]) return p.value * Math.pow(0.9, k); return p.value * ageFactor(p.pos, p.age + k) / ageFactor(p.pos, p.age); }
 function dynastyOutlook(m) {
   if (m.lg.type !== 'dynasty') return null;
   const season = +m.lg.season || new Date().getFullYear();
-  const WIN = [{ k: 0, label: 'Now', year: season }, { k: 1, label: String(season + 1), year: season + 1 }, { k: 3, label: String(season + 3), year: season + 3 }];
+  const WIN = [{ k: 0, label: 'Now', year: season }, { k: 1, label: String(season + 1), year: season + 1 }, { k: 2, label: String(season + 2), year: season + 2 }];
   const today = new Date().toISOString().slice(0, 10);
   const newsR = new Map(); ((typeof NEWS !== 'undefined' && NEWS && NEWS.items) || []).filter(x => !x.until || x.until >= today).forEach(x => { if (x.espn) newsR.set(String(x.espn), x.redraft); });
   const nowVal = p => {
@@ -301,7 +301,8 @@ function dynastyOutlook(m) {
       /* Players in the IR slot sit out "Now" but count in later years: they'll be healthy by then. */
       const proj = sk.map(p => Object.assign({}, p, w.k === 0 ? { pv: nowVal(p) } : { pv: later(p, w.k), slot: p.slot === 21 ? 20 : p.slot }));
       let s = lineup(proj, m.lg.slots, 'pv').value;
-      if (w.k > 0) (t.picks || []).forEach(pk => { const yrs = season + w.k - pk.year; if (yrs >= 0) s += 0.5 * pk.value * [0.55, 0.85, 1][Math.min(2, yrs)]; });
+      /* Every future pick a team owns counts at full value in each later year: it's a rookie by then or trade capital to turn into a starter. */
+      if (w.k > 0) (t.picks || []).forEach(pk => { if (pk.year > season) s += pk.value; });
       return s;
     });
     const st = lineup(t.players, m.lg.slots).starters.map(x => x.p).filter(p => p && p.age);
@@ -341,7 +342,7 @@ function gamePlan(m, o, teamId) {
   const others = o.rows.filter(x => x.team.id !== t.id);
   const isBuyer = x => ['Win now', 'Fading', 'Dynasty power', 'Middle'].includes(x.label) && x.ranks[0] <= half + 1;
   const isSeller = x => ['Rebuilding', 'Stuck', 'Rising'].includes(x.label) || x.ranks[2] < x.ranks[0] - 2;
-  const loss = p => p.value ? 1 - outlookLater(p, 3) / p.value : 0;
+  const loss = p => p.value ? 1 - outlookLater(p, 2) / p.value : 0;
   const skill = t.players.filter(p => SKILL.includes(p.pos) && p.value >= 300);
   /* sell: players whose value drops most by year 3 (rebuild), or surplus/aging bench pieces (contend) */
   const startersIds = new Set(lineup(t.players, m.lg.slots).starters.map(x => x.p && x.p.id).filter(Boolean));
