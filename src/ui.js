@@ -235,7 +235,7 @@ function playerLine(p, opts) {
   const est = p.est ? '<span class="estb' + (p.est === 'manual' ? ' man' : '') + '" title="' + esc(p.estWhy || '') + '">' + (p.est === 'manual' ? 'your value' : p.est === 'season' ? 'out for season' : 'est.') + '</span>' : '';
   return '<div class="pl" data-act="player" data-id="' + esc(p.id) + '" role="button" tabindex="0">' + avatar(p, opts.size) + '<div class="pl-text"><div class="pl-main"><span class="pl-name">' + esc(p.name) + '</span>' +
     (p.inj ? '<span class="inj" title="' + esc(p.inj.replace('_', ' ').toLowerCase()) + '">' + esc(INJ_SHORT[p.inj] || p.inj.slice(0, 3)) + '</span>' : '') + '</div>' +
-    '<div class="pl-meta">' + posChip(p.pos) + (p.pos === 'PICK' ? '<span>' + esc(p.team || 'Draft pick') + '</span>' : teamBadge(p.team)) + dyn + trendTag(p.trend, p.value) + est + (p.news ? '<span class="newsb" title="' + esc(p.news.note) + '">news</span>' : '') + '</div></div></div>';
+    '<div class="pl-meta">' + posChip(p.pos) + (p.pos === 'PICK' ? '<span>' + esc(p.team || 'Draft pick') + '</span>' : teamBadge(p.team)) + dyn + trendTag(p.trend, p.value) + est + wxChip(p.team) +(p.news ? '<span class="newsb" title="' + esc(p.news.note) + '">news</span>' : '') + '</div></div></div>';
 }
 const teamName = t => esc(t ? t.name : '');
 
@@ -302,7 +302,7 @@ function viewTeam(m) {
     '<div class="tiles">' + tiles.map(x => '<div class="tile"><div class="tile-k">' + x[0] + '</div><div class="tile-v">' + esc(x[1]) + '</div><div class="tile-s">' + esc(x[2]) + '</div></div>').join('') + '</div>' +
     '<div class="grid2"><section class="card"><h3>Starter strength by position</h3><p class="muted small">Total trade value of the starters at each spot, ranked against the league. The tick mark is the league average.</p>' + bars + '</section>' +
     '<section class="card"><h3>Best lineup by trade value</h3><p class="muted small">Tap any value to change it. “est. value” marks players FantasyCalc doesn’t value, so the app estimated one.</p><table class="roster"><tbody>' + starters + '</tbody></table><h3 class="mt">Bench</h3><table class="roster"><tbody>' + bench + '</tbody></table></section></div>' +
-    (dyn ? picksCard(m, t) : '') + valueChart(m, t) + (isMe ? offseasonCard(m, t) : '') +
+    wxCard(t) + (dyn ? picksCard(m, t) : '') + valueChart(m, t) + (isMe ? offseasonCard(m, t) : '') +
     (isMe ? '' : '<p class="mt"><button class="btn" data-act="tradeWith" data-id="' + t.id + '">Find trades with ' + teamName(t) + '</button></p>');
 }
 
@@ -902,3 +902,4 @@ try { S.order.forEach(id => { const l = S.leagues[id]; if (l && !l.demo && !(l.h
 ensureLeague();
 route();
 connect();
+wxLoad().then(ok => { if (ok) render(); });
