@@ -1,5 +1,5 @@
 {
- "asOf": "2026-11-27",
+ "asOf": "2026-11-28",
  "season": 2026,
  "players": {
   "Jeremiah Smith": {
@@ -25,7 +25,7 @@
   },
   "Jadan Baugh": {
    "espn": "5079322",
-   "stats": "197 car · 980 yds · 16 TD",
+   "stats": "216 car · 1,057 yds · 17 TD",
    "career": [
     [
      2024,
@@ -37,7 +37,7 @@
     ],
     [
      2026,
-     "197 car · 980 yds · 16 TD"
+     "216 car · 1,057 yds · 17 TD"
     ]
    ],
    "ht": "6'1\"",
@@ -84,7 +84,7 @@
   },
   "Cam Coleman": {
    "espn": "5079376",
-   "stats": "24 rec · 425 yds · 7 TD",
+   "stats": "28 rec · 462 yds · 8 TD",
    "career": [
     [
      2024,
@@ -96,7 +96,7 @@
     ],
     [
      2026,
-     "24 rec · 425 yds · 7 TD"
+     "28 rec · 462 yds · 8 TD"
     ]
    ],
    "ht": "6'3\"",
@@ -503,7 +503,7 @@
   },
   "Mario Craver": {
    "espn": "5079345",
-   "stats": "43 rec · 438 yds · 3 TD",
+   "stats": "48 rec · 470 yds · 3 TD",
    "career": [
     [
      2024,
@@ -515,7 +515,7 @@
     ],
     [
      2026,
-     "43 rec · 438 yds · 3 TD"
+     "48 rec · 470 yds · 3 TD"
     ]
    ],
    "ht": "5'9\"",
@@ -524,7 +524,7 @@
   },
   "Deuce Alexander": {
    "espn": "5152158",
-   "stats": "55 rec · 815 yds · 7 TD",
+   "stats": "62 rec · 854 yds · 7 TD",
    "career": [
     [
      2023,
@@ -540,7 +540,7 @@
     ],
     [
      2026,
-     "55 rec · 815 yds · 7 TD"
+     "62 rec · 854 yds · 7 TD"
     ]
    ],
    "ht": "6'0\"",
@@ -570,7 +570,7 @@
   },
   "Trinidad Chambliss": {
    "espn": "4911529",
-   "stats": "2,853 yds · 24 TD · 9 INT · 7 rush TD",
+   "stats": "3,090 yds · 26 TD · 9 INT · 8 rush TD",
    "career": [
     [
      2024,
@@ -582,7 +582,7 @@
     ],
     [
      2026,
-     "2,853 yds · 24 TD · 9 INT · 7 rush TD"
+     "3,090 yds · 26 TD · 9 INT · 8 rush TD"
     ]
    ],
    "ht": "6'0\"",
@@ -683,7 +683,7 @@
   },
   "Wayshawn Parker": {
    "espn": "5173431",
-   "stats": "125 car · 765 yds · 9 TD · 29 rec",
+   "stats": "130 car · 766 yds · 9 TD · 31 rec",
    "career": [
     [
      2024,
@@ -695,7 +695,7 @@
     ],
     [
      2026,
-     "125 car · 765 yds · 9 TD · 29 rec"
+     "130 car · 766 yds · 9 TD · 31 rec"
     ]
    ],
    "ht": "5'10\"",
@@ -729,7 +729,7 @@
   },
   "Ryan Wingo": {
    "espn": "5218633",
-   "stats": "54 rec · 659 yds · 4 TD",
+   "stats": "59 rec · 696 yds · 4 TD",
    "career": [
     [
      2024,
@@ -741,7 +741,7 @@
     ],
     [
      2026,
-     "54 rec · 659 yds · 4 TD"
+     "59 rec · 696 yds · 4 TD"
     ]
    ],
    "ht": "6'2\"",
@@ -775,7 +775,7 @@
   },
   "Arch Manning": {
    "espn": "4870906",
-   "stats": "2,485 yds · 21 TD · 10 INT · 4 rush TD",
+   "stats": "2,628 yds · 22 TD · 11 INT · 4 rush TD",
    "career": [
     [
      2023,
@@ -791,7 +791,7 @@
     ],
     [
      2026,
-     "2,485 yds · 21 TD · 10 INT · 4 rush TD"
+     "2,628 yds · 22 TD · 11 INT · 4 rush TD"
     ]
    ],
    "ht": "6'4\"",
@@ -846,7 +846,7 @@
   },
   "Raleek Brown": {
    "espn": "4685268",
-   "stats": "129 car · 585 yds · 6 TD · 25 rec",
+   "stats": "138 car · 608 yds · 6 TD · 26 rec",
    "career": [
     [
      2022,
@@ -866,7 +866,7 @@
     ],
     [
      2026,
-     "129 car · 585 yds · 6 TD · 25 rec"
+     "138 car · 608 yds · 6 TD · 26 rec"
     ]
    ],
    "ht": "5'9\"",
@@ -950,7 +950,7 @@
   },
   "Anthony Evans III": {
    "espn": "4907671",
-   "stats": "73 rec · 929 yds · 6 TD",
+   "stats": "78 rec · 944 yds · 6 TD",
    "career": [
     [
      2023,
@@ -966,7 +966,7 @@
     ],
     [
      2026,
-     "73 rec · 929 yds · 6 TD"
+     "78 rec · 944 yds · 6 TD"
     ]
    ],
    "ht": "5'11\"",
@@ -1071,7 +1071,7 @@
   },
   "Fluff Bothwell": {
    "espn": "5220197",
-   "stats": "134 car · 649 yds · 3 TD · 20 rec",
+   "stats": "152 car · 778 yds · 4 TD · 23 rec",
    "career": [
     [
      2024,
@@ -1083,7 +1083,7 @@
     ],
     [
      2026,
-     "134 car · 649 yds · 3 TD · 20 rec"
+     "152 car · 778 yds · 4 TD · 23 rec"
     ]
    ],
    "ht": "5'10\"",
@@ -1117,7 +1117,7 @@
   },
   "Eric Singleton Jr.": {
    "espn": "5095360",
-   "stats": "21 rec · 226 yds · 0 TD",
+   "stats": "25 rec · 297 yds · 0 TD",
    "career": [
     [
      2023,
@@ -1133,7 +1133,7 @@
     ],
     [
      2026,
-     "21 rec · 226 yds · 0 TD"
+     "25 rec · 297 yds · 0 TD"
     ]
    ],
    "ht": "5'10\"",
@@ -1330,7 +1330,7 @@
   },
   "Darius Taylor": {
    "espn": "4920901",
-   "stats": "125 car · 403 yds · 6 TD · 32 rec",
+   "stats": "130 car · 417 yds · 6 TD · 36 rec",
    "career": [
     [
      2023,
@@ -1346,7 +1346,7 @@
     ],
     [
      2026,
-     "125 car · 403 yds · 6 TD · 32 rec"
+     "130 car · 417 yds · 6 TD · 36 rec"
     ]
    ],
    "ht": "6'0\"",
